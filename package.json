@@ -1,6 +1,6 @@
 {
-  "name": "dsh-hydrophone",
-  "description": "Background stream listeners that wake the DeepSeek Harness agent — drop a hydrophone on a command or file and hear new lines as in-session notices. The harness analog of Claude Code's Monitor tool, built on the first-class jobs subsystem.",
+  "name": "dsh-watch",
+  "description": "Background stream listeners that wake the DeepSeek Harness agent — put a watch on a command or file and receive new lines as in-session notices. The harness analog of Claude Code's Monitor tool, built on the first-class jobs subsystem.",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
@@ -22,7 +22,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dshworks/dsh-hydrophone.git"
+    "url": "git+https://github.com/dshworks/dsh-watch.git"
   },
   "scripts": {
     "test": "vitest run"

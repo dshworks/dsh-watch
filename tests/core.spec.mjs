@@ -120,19 +120,19 @@ describe('chopFileWindow', () => {
 
 describe('formatNotice', () => {
   it('leads with the label, id, and line count', () => {
-    const { text, summary } = formatNotice('dev', 'hydrophone-1', ['boom'], 4096)
-    expect(text).toBe('[hydrophone dev · hydrophone-1] 1 line:\nboom')
+    const { text, summary } = formatNotice('dev', 'watch-1', ['boom'], 4096)
+    expect(text).toBe('[watch dev · watch-1] 1 line:\nboom')
     expect(summary).toBe('dev: boom')
   })
 
   it('caps the complete notice, wrapper included', () => {
-    const { text } = formatNotice('dev', 'hydrophone-1', ['x'.repeat(9000)], 512)
+    const { text } = formatNotice('dev', 'watch-1', ['x'.repeat(9000)], 512)
     expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(512)
     expect(text).toContain('[notice truncated')
   })
 
   it('pluralizes multi-line batches', () => {
-    const { text } = formatNotice('dev', 'hydrophone-2', ['a', 'b'], 4096)
+    const { text } = formatNotice('dev', 'watch-2', ['a', 'b'], 4096)
     expect(text).toContain('2 lines:')
   })
 })

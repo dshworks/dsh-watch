@@ -31,7 +31,7 @@ function makeCtx({ shell } = {}) {
     jobs: {
       start: (spec) => {
         const hooks = spec.run()
-        const id = `hydrophone-${++jobSeq}`
+        const id = `watch-${++jobSeq}`
         captured.jobs.push({ id, spec, hooks })
         return id
       },
@@ -54,16 +54,16 @@ function makeAgent(status = 'idle') {
   }
 }
 
-/** Invoke the registered hydrophone tool as the model would. */
+/** Invoke the registered watch tool as the model would. */
 async function callTool(captured, args, agent) {
-  const tool = captured.tools.get('hydrophone')
+  const tool = captured.tools.get('watch')
   return tool.execute(args, { agent, signal: new AbortController().signal })
 }
 
 let dir
 beforeEach(() => {
   vi.useFakeTimers()
-  dir = mkdtempSync(join(tmpdir(), 'hydrophone-'))
+  dir = mkdtempSync(join(tmpdir(), 'watch-'))
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -72,15 +72,15 @@ afterEach(() => {
 
 describe('registration', () => {
   it('exports the function-plugin surface', () => {
-    expect(name).toBe('dsh-hydrophone')
+    expect(name).toBe('dsh-watch')
     expect(inject).toEqual(['tools', 'systemPrompt', 'jobs'])
   })
 
   it('registers the tool, prompt section, and a disposal effect', () => {
     const { ctx, captured } = makeCtx()
     apply(ctx, CONFIG)
-    expect(captured.tools.has('hydrophone')).toBe(true)
-    expect(captured.sections.map(s => s.name)).toContain('tool:hydrophone')
+    expect(captured.tools.has('watch')).toBe(true)
+    expect(captured.sections.map(s => s.name)).toContain('tool:watch')
     expect(captured.effects.length).toBeGreaterThan(0)
   })
 })
@@ -93,7 +93,7 @@ describe('file listeners', () => {
     const path = join(dir, 'log')
     writeFileSync(path, 'old line\n')
     const result = await callTool(captured, { source: 'file', path, label: 'log' }, agent)
-    expect(result.job_id).toBe('hydrophone-1')
+    expect(result.job_id).toBe('watch-1')
     appendFileSync(path, 'fresh line\n')
     vi.advanceTimersByTime(CONFIG.pollIntervalMs)
     expect(agent.followup).toHaveBeenCalledTimes(1)
@@ -185,7 +185,7 @@ describe('file listeners', () => {
     await callTool(captured, { source: 'file', path }, agent)
     captured.jobs[0].hooks.cancel()
     const outcome = await captured.jobs[0].hooks.done
-    expect(outcome).toEqual({ status: 'killed', detail: 'hydrophone disarmed' })
+    expect(outcome).toEqual({ status: 'killed', detail: 'watch disarmed' })
     appendFileSync(path, 'unheard\n')
     vi.advanceTimersByTime(CONFIG.pollIntervalMs)
     expect(agent.followup).not.toHaveBeenCalled()
@@ -360,7 +360,7 @@ describe('command listeners', () => {
     expect(proc.kill).toHaveBeenCalled()
     exit(null)
     const outcome = await captured.jobs[0].hooks.done
-    expect(outcome).toEqual({ status: 'killed', detail: 'hydrophone disarmed' })
+    expect(outcome).toEqual({ status: 'killed', detail: 'watch disarmed' })
   })
 
   it('fails loud without the shell capability', async () => {

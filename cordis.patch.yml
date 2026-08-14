@@ -1,7 +1,7 @@
-# dsh-hydrophone bundle patch: mount the listener tool as one composition row.
+# dsh-watch bundle patch: mount the listener tool as one composition row.
 # Requires the jobs subsystem (@deepseek-ai/dsh-jobs + dsh-jobs-local +
 # dsh-tool-jobs, present in stock web/headless profiles) and, for command
 # sources, the shell capability.
 - insert:
-    - id: dsh-hydrophone
-      name: 'dsh-hydrophone'
+    - id: dsh-watch
+      name: 'dsh-watch'
