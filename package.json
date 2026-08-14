@@ -1,7 +1,7 @@
 {
   "name": "dsh-watch",
   "description": "Background stream listeners that wake the DeepSeek Harness agent — put a watch on a command or file and receive new lines as in-session notices. The harness analog of Claude Code's Monitor tool, built on the first-class jobs subsystem.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -56,5 +56,10 @@
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }

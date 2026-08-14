@@ -397,6 +397,21 @@ describe('guardrails', () => {
     await expect(callTool(captured, { source: 'file', path }, agent)).resolves.toBeTruthy()
   })
 
+  it('tears the armed poller down when the registry rejects the job after run()', async () => {
+    const { ctx, captured } = makeCtx()
+    // A registry that runs the producer, then refuses the job.
+    ctx.jobs = { start: (spec) => { spec.run(); throw new Error('job limit reached') } }
+    apply(ctx, CONFIG)
+    const agent = makeAgent('idle')
+    const path = join(dir, 'log')
+    writeFileSync(path, '')
+    await expect(callTool(captured, { source: 'file', path }, agent)).rejects.toThrow(/job limit/)
+    appendFileSync(path, 'must stay unheard\n')
+    vi.advanceTimersByTime(CONFIG.pollIntervalMs * 2)
+    expect(agent.followup).not.toHaveBeenCalled()
+    expect(agent.inject).not.toHaveBeenCalled()
+  })
+
   it('plugin disposal tears every listener down', async () => {
     const { ctx, captured } = makeCtx()
     apply(ctx, CONFIG)

@@ -1,5 +1,6 @@
 # dsh-watch
 
+[![ci](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml)
 [![powered by dsh](https://img.shields.io/badge/powered__by-dsh-4D6BFE?logo=deepseek)](https://github.com/deepseek-ai/deepseek-harness)
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -84,9 +85,11 @@ A silent source costs zero tokens — polling happens host-side. Each notice cos
 ## Testing
 
 ```sh
-pnpm install && pnpm test    # 49 tests: line assembly, multibyte byte caps,
-                           # batching, filters, budgets, truncation, teardown
+pnpm install && pnpm test    # 50 tests: line assembly, multibyte byte caps,
+                             # batching, filters, budgets, truncation, teardown
 ```
+
+Beyond the suite, the full lifecycle is verified against a live `dsh --profile web` session on `0.1.0-rc.6` with DeepSeek-V4-Pro (2026-08-14): arm → silence on non-matching lines → wake-on-match while idle → disarm via stock `job_kill` → silence after disarm.
 
 Plain ESM JavaScript in `lib/` — nothing builds at install time, so a git install has no `allowBuilds` surface.
 
