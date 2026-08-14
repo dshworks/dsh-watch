@@ -11,6 +11,8 @@ Every watch is a **first-class background job** (kind `watch`), so the standard 
 
 ## 60-second start
 
+`dsh plugin` forwards to pnpm, so pnpm must be on PATH.
+
 ```sh
 dsh plugin --profile web add github:dshworks/dsh-watch
 dsh --profile web
@@ -82,7 +84,7 @@ A silent source costs zero tokens — polling happens host-side. Each notice cos
 ## Testing
 
 ```sh
-npm install && npm test    # 49 tests: line assembly, multibyte byte caps,
+pnpm install && pnpm test    # 49 tests: line assembly, multibyte byte caps,
                            # batching, filters, budgets, truncation, teardown
 ```
 
