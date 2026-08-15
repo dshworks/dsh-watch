@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { capBytes, chopFileWindow, compileFilter, createBacklog, createLineBuffer, formatNotice } from '../lib/core.js'
+import { capBytes, chopFileWindow, compileFilter, createBacklog, createLineBuffer, createWakeBudget, formatNotice } from '../lib/core.js'
 
 describe('createLineBuffer', () => {
   it('assembles lines split across chunks', () => {
@@ -160,5 +160,81 @@ describe('createBacklog', () => {
     const backlog = createBacklog(1024)
     backlog.push('x'.repeat(5000))
     expect(backlog.drain()).toContain('x'.repeat(5000))
+  })
+})
+
+describe('createWakeBudget', () => {
+  it('allows a burst up to capacity and then refuses', () => {
+    const budget = createWakeBudget({ capacity: 2, refillMs: 1000 })
+    const owner = {}
+    expect(budget.take(owner, 0)).toBe(true)
+    expect(budget.take(owner, 0)).toBe(true)
+    expect(budget.take(owner, 0)).toBe(false)
+  })
+
+  it('restores one credit per refill period, capped at capacity', () => {
+    const budget = createWakeBudget({ capacity: 2, refillMs: 1000 })
+    const owner = {}
+    budget.take(owner, 0)
+    budget.take(owner, 0)
+    expect(budget.take(owner, 999)).toBe(false)
+    expect(budget.take(owner, 1000)).toBe(true)
+    expect(budget.take(owner, 1000)).toBe(false)
+    // A long silence cannot bank more than the burst capacity.
+    expect(budget.take(owner, 1_000_000)).toBe(true)
+    expect(budget.take(owner, 1_000_000)).toBe(true)
+    expect(budget.take(owner, 1_000_000)).toBe(false)
+  })
+
+  it('does not drop the remainder of a partial refill period', () => {
+    const budget = createWakeBudget({ capacity: 3, refillMs: 1000 })
+    const owner = {}
+    for (let i = 0; i < 3; i++) budget.take(owner, 0)
+    // Reading at 1500 restores one credit; the leftover 500 ms still counts
+    // toward the next one, which is therefore due at 2000, not 2500.
+    expect(budget.take(owner, 1500)).toBe(true)
+    expect(budget.take(owner, 1999)).toBe(false)
+    expect(budget.take(owner, 2000)).toBe(true)
+  })
+
+  it('starts the refill clock at the first spend, not at first sight', () => {
+    const budget = createWakeBudget({ capacity: 1, refillMs: 1000 })
+    const owner = {}
+    expect(budget.take(owner, 5000)).toBe(true)
+    expect(budget.take(owner, 5999)).toBe(false)
+    expect(budget.take(owner, 6000)).toBe(true)
+  })
+
+  it('refill() restores the full burst', () => {
+    const budget = createWakeBudget({ capacity: 2, refillMs: 0 })
+    const owner = {}
+    budget.take(owner, 0)
+    budget.take(owner, 0)
+    expect(budget.take(owner, 0)).toBe(false)
+    budget.refill(owner)
+    expect(budget.take(owner, 0)).toBe(true)
+  })
+
+  it('refillMs: 0 never restores a credit on its own', () => {
+    const budget = createWakeBudget({ capacity: 1, refillMs: 0 })
+    const owner = {}
+    expect(budget.take(owner, 0)).toBe(true)
+    expect(budget.take(owner, 86_400_000)).toBe(false)
+  })
+
+  it('capacity: 0 refuses every wake', () => {
+    const budget = createWakeBudget({ capacity: 0, refillMs: 1000 })
+    const owner = {}
+    expect(budget.take(owner, 0)).toBe(false)
+    expect(budget.take(owner, 10_000)).toBe(false)
+  })
+
+  it('tracks owners independently', () => {
+    const budget = createWakeBudget({ capacity: 1, refillMs: 1000 })
+    const a = {}
+    const b = {}
+    expect(budget.take(a, 0)).toBe(true)
+    expect(budget.take(a, 0)).toBe(false)
+    expect(budget.take(b, 0)).toBe(true)
   })
 })
