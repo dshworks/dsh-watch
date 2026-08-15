@@ -45,7 +45,7 @@
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh;
   }
-  #hero { width: 660px; padding: 26px; }
+  #hero { width: 730px; padding: 26px; }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -85,6 +85,8 @@
   .repo { color: var(--bright); }
   .note { color: var(--dim); }
   .quiet { color: var(--dimmer); font-style: italic; }
+  .kept { color: var(--text); }
+  .dest { color: var(--accent-soft); }
   .cmdrow { padding-bottom: 8px; }
   .quietrow { padding: 6px 0 6px 34px; }
   .caption { margin-top: 16px; padding: 0 6px; }
@@ -114,26 +116,41 @@
         </tr>
         <tr>
           <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h16" stroke="currentColor" stroke-width="1.5" fill="none" style="color:var(--dimmer)"/></svg></td>
-          <td class="ts">16:08:02Z</td>
+          <td class="ts">16:21:23Z</td>
           <td class="sys">up — session 36041f74</td>
         </tr>
         <tr>
           <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h16" stroke="currentColor" stroke-width="1.5" fill="none" style="color:var(--dimmer)"/></svg></td>
-          <td class="ts">16:08:02Z</td>
+          <td class="ts">16:21:28Z</td>
           <td class="note">Standing by.</td>
         </tr>
         <tr>
-          <td colspan="3" class="quiet quietrow">… idle — no tokens spent while nothing happens …</td>
+          <td colspan="3" class="quiet quietrow">… idle — no tokens while nothing happens …</td>
         </tr>
         <tr>
           <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h4l2-9 2 18 2-13 2 4h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" style="color:var(--wake)"/></svg></td>
-          <td class="ts">16:08:30Z</td>
-          <td><span class="heard">HEARD</span> <span class="repo">acme/dsh-radar</span> <span class="sys">— 0★, 2m old</span></td>
+          <td class="ts">16:25:11Z</td>
+          <td><span class="heard">HEARD</span> <span class="repo">53 new repos</span><span class="sys">. Kept 11, dropped 42.</span></td>
         </tr>
         <tr>
-          <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h4l2-9 2 18 2-13 2 4h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" style="color:var(--wake)"/></svg></td>
-          <td class="ts">16:09:05Z</td>
-          <td><span class="heard">HEARD</span> <span class="repo">beta/dsh-lantern</span> <span class="sys">→ ideas.ndjson</span></td>
+          <td class="gutter"></td>
+          <td class="ts"></td>
+          <td class="kept"> → liustack/modlens<span class="dest">               awesome-dsh-plugins</span></td>
+        </tr>
+        <tr>
+          <td class="gutter"></td>
+          <td class="ts"></td>
+          <td class="kept"> → omdsh-dev/DSH-better-sidebar<span class="dest">   awesome-dsh-plugins</span></td>
+        </tr>
+        <tr>
+          <td class="gutter"></td>
+          <td class="ts"></td>
+          <td class="kept"> → kongxiangyiren/dhs-theme-plugin<span class="dest"> awesome-dsh-themes</span></td>
+        </tr>
+        <tr>
+          <td class="gutter"></td>
+          <td class="ts"></td>
+          <td class="quiet"> … 8 more → data/ideas.ndjson</td>
         </tr>
       </table>
     </div>
