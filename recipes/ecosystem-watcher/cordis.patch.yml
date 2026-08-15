@@ -1,0 +1,49 @@
+# A standing ecosystem watcher: the ear, the body, and one source.
+#
+# Copy into ~/.dsh/profiles/<name>/cordis.patch.yml, then:
+#   dsh plugin --profile <name> add @dshworks/dsh-watch
+#   dsh --profile <name> | tee -a watcher.log
+#
+# The feed is a plain child process the watch owns, so it lives and dies with
+# the session and needs no separate supervisor.
+
+- id: dsh-watch
+  config:
+    # A poll every two seconds is plenty for a source that speaks every 15
+    # minutes, and it keeps the catch-up sweep responsive.
+    pollIntervalMs: 2000
+    # One wake per five minutes sustained, after a burst of three. A watcher
+    # is judged on not missing things, not on latency.
+    maxConsecutiveWakes: 3
+    wakeRefillMs: 300000
+    autoArm:
+      - source: command
+        # Point --topic at whatever ecosystem you are watching.
+        command: node recipes/ecosystem-watcher/feed.mjs --topic dsh-plugin --topic dsh-theme --interval 900
+        pattern: '"kind":"new-repo"'
+        label: ecosystem
+        # A watcher that disarms itself after 50 finds is not a watcher.
+        max_events: 0
+
+- insert:
+    - id: dsh-watch-daemon
+      name: '@dshworks/dsh-watch/daemon'
+      config:
+        brief: >-
+          You are the dshworks ecosystem watcher. A standing watch named
+          "ecosystem" is armed on a feed of newly published dsh plugin and
+          theme repositories; each notice is one or more NDJSON lines.
+
+          For each repository you hear about, decide one thing: is there an
+          idea here worth carrying into dshworks? Look at what it does, not
+          at its star count — a repo minutes old has none.
+
+          When something is worth keeping, append one line to
+          data/ideas.ndjson: {"repo", "url", "why", "for"} where "why" is a
+          single concrete sentence and "for" names the dshworks repo it would
+          land in. When nothing is worth keeping, reply with one short line
+          saying what you skipped and why, and do not write the file.
+
+          Never rewrite or reorder that file — you are appending to a log
+          someone else reads. Never open a pull request; your output is the
+          log.
