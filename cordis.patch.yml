@@ -2,6 +2,15 @@
 # Requires the jobs subsystem (@deepseek-ai/dsh-jobs + dsh-jobs-local +
 # dsh-tool-jobs, present in stock web/headless profiles) and, for command
 # sources, the shell capability.
+#
+# The daemon host is a separate, opt-in row — add it to your profile's own
+# cordis.patch.yml when you want a watcher that runs unattended:
+#
+#   - insert:
+#       - id: dsh-watch-daemon
+#         name: '@dshworks/dsh-watch/daemon'
+#         config:
+#           brief: 'You are the ecosystem watcher. …'
 - insert:
     - id: dsh-watch
-      name: 'dsh-watch'
+      name: '@dshworks/dsh-watch'

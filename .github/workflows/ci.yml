@@ -17,5 +17,14 @@ jobs:
         with:
           node-version: 24
       - run: npm install --no-audit --no-fund
-      - run: node --check lib/index.js && node --check lib/core.js
+      - name: syntax check every shipped module
+        run: |
+          for f in lib/*.js recipes/*/*.mjs; do node --check "$f"; done
+      - name: the bundle patch must name the published package
+        # `name` is the specifier the Loader resolves. An unscoped name here
+        # boots fine from a linked folder and fails from npm with
+        # "Cannot find package" — a break only an installed user would see.
+        run: |
+          pkg=$(node -p "require('./package.json').name")
+          grep -q "name: '$pkg'" cordis.patch.yml
       - run: npm test

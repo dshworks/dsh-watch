@@ -1,0 +1,49 @@
+# dsh-watch
+
+> A DeepSeek Harness (dsh) plugin that puts background listeners on streams:
+> arm a watch on a long-running command or a growing file, and new matching
+> lines wake the owning agent as bounded in-session notices. Ships an
+> optional daemon host so a watcher can run unattended for weeks with no
+> human and no one-shot task.
+
+npm: `@dshworks/dsh-watch` (scoped; the bundle patch's `name` must match it).
+Install: `dsh plugin --profile web add @dshworks/dsh-watch`.
+
+## The two exports
+
+- `@dshworks/dsh-watch` — the plugin. Registers one tool, `watch`
+  (`source: command|file`, `command`/`path`, `workdir`, `pattern`,
+  `max_events`, `label`). Every watch is a first-class background job of
+  kind `watch`, so `job_list`, `job_output`, and `job_kill` are the list,
+  read, and disarm surface. Config: `pollIntervalMs`, `maxNoticeBytes`,
+  `maxConsecutiveWakes`, `wakeRefillMs`, `defaultMaxEvents`,
+  `maxListenersPerOwner`, `backlogBytes`, `autoArm`.
+- `@dshworks/dsh-watch/daemon` — an opt-in host plugin (`brief`,
+  `flushIntervalMs`, `journal`) that creates one root agent, seeds a
+  standing brief, keeps the process alive, and journals each active
+  period's closing text to stdout with an ISO timestamp.
+
+## Facts that are easy to get wrong
+
+- Delivery: an idle owner is woken with `followup`, a busy one gets
+  `inject`. Injection alone never wakes the driver, so an out-of-credit
+  idle owner is owed a catch-up wake — which is what the poll-tick sweep
+  provides.
+- The wake budget is a token bucket, not a counter: burst
+  `maxConsecutiveWakes`, one credit back per `wakeRefillMs` (default
+  60000; `0` disables time refill). A claimed user message refills it.
+- `max_events: 0` and `defaultMaxEvents: 0` mean unbounded, not zero.
+- `autoArm` goes through `ctx.tools.execute()`. Callers must never mint an
+  execution token; the registry assigns it.
+- No stock dsh surface hosts a standing agent: `--profile headless` exits
+  at quiescence, `--profile web` waits for a browser. That gap is why the
+  daemon export exists.
+- Watches do not survive a restart. A restarted daemon opens a fresh
+  session and re-arms from `autoArm`.
+
+## Links
+
+- README: https://github.com/dshworks/dsh-watch#readme (中文: README.zh.md)
+- Recipe: https://github.com/dshworks/dsh-watch/tree/main/recipes/ecosystem-watcher
+- Changelog: https://github.com/dshworks/dsh-watch/blob/main/CHANGELOG.md
+- License: MIT. Not affiliated with DeepSeek.

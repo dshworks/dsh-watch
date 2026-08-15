@@ -1,0 +1,148 @@
+<!doctype html>
+<!--
+  Source of docs/watch-dark.png and docs/watch-light.png.
+
+  The terminal content is a verbatim transcript of a real `dsh --profile
+  watcher` run (2026-08-15), not a mockup: same lines, same timestamps, same
+  latencies. Regenerate by serving this file and screenshotting #hero at 2x.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>dsh-watch — hero</title>
+<style>
+  :root {
+    --bg: #05070c;
+    --card: #0c0f16;
+    --card-top: #10141d;
+    --line: #1b212e;
+    --dim: #4a5568;
+    --dimmer: #333c4d;
+    --text: #cbd5e1;
+    --bright: #f1f5f9;
+    --accent: #4d6bfe;
+    --accent-soft: #7c93ff;
+    --wake: #ffb454;
+  }
+  html.light {
+    --bg: #eef1f6;
+    --card: #ffffff;
+    --card-top: #f6f8fb;
+    --line: #dde3ec;
+    --dim: #8794a8;
+    --dimmer: #b3bdcc;
+    --text: #333e52;
+    --bright: #0d1220;
+    --accent: #2f4ce0;
+    --accent-soft: #4d6bfe;
+    --wake: #b5730c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font: 13.5px/1.7 ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh;
+  }
+  #hero { width: 700px; padding: 30px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 70px -20px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02) inset;
+  }
+  html.light .card { box-shadow: 0 20px 48px -22px rgba(28,40,70,.28); }
+  .top {
+    display: flex; align-items: center; gap: 9px;
+    padding: 12px 16px;
+    background: var(--card-top);
+    border-bottom: 1px solid var(--line);
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--dimmer); }
+  .title { margin-left: 8px; color: var(--dim); font-size: 12.5px; letter-spacing: .04em; }
+  .title b { color: var(--text); font-weight: 500; }
+  .badge {
+    margin-left: auto; display: flex; align-items: center; gap: 7px;
+    color: var(--dim); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+  }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+           box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .body { padding: 16px 18px 18px; }
+  table { border-collapse: collapse; width: 100%; }
+  td { vertical-align: top; padding: 1.5px 0; white-space: pre; }
+  /* The gutter is the product in one glyph: flat while the source is quiet,
+     a spike on the tick that woke the agent. */
+  td.gutter { width: 22px; padding-right: 10px; }
+  .wave { display: block; width: 14px; height: 20px; }
+  .ts { color: var(--dimmer); padding-right: 12px; width: 1px; font-size: 12.5px; }
+  .cmd { color: var(--bright); }
+  .prompt { color: var(--accent); }
+  .flag { color: var(--accent-soft); }
+  .sys { color: var(--dim); }
+  .heard { color: var(--wake); font-weight: 600; letter-spacing: .02em; }
+  .repo { color: var(--bright); }
+  .note { color: var(--dim); }
+  .quiet { color: var(--dimmer); font-style: italic; }
+  .cmdrow { padding-bottom: 8px; }
+  .quietrow { padding: 6px 0 6px 34px; }
+  .caption { margin-top: 16px; padding: 0 6px; }
+  .caption div {
+    color: var(--dim); font-size: 12px; letter-spacing: .01em;
+    padding: 2.5px 0 2.5px 16px; position: relative;
+  }
+  .caption div::before {
+    content: ''; position: absolute; left: 0; top: 9px;
+    width: 6px; height: 1.5px; background: var(--accent); opacity: .8;
+  }
+  .caption b { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="hero">
+  <div class="card">
+    <div class="top">
+      <i class="dot"></i><i class="dot"></i><i class="dot"></i>
+      <span class="title">dshworks — <b>ecosystem watcher</b></span>
+      <span class="badge"><i class="pulse"></i>armed</span>
+    </div>
+    <div class="body">
+      <table>
+        <tr>
+          <td colspan="3" class="cmdrow"><span class="prompt">$</span> <span class="cmd">dsh</span> <span class="flag">--profile</span> <span class="cmd">watcher</span> <span class="sys">| tee -a watcher.log</span></td>
+        </tr>
+        <tr>
+          <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h16" stroke="currentColor" stroke-width="1.5" fill="none" style="color:var(--dimmer)"/></svg></td>
+          <td class="ts">16:08:02Z</td>
+          <td class="sys">up — session 36041f74</td>
+        </tr>
+        <tr>
+          <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h16" stroke="currentColor" stroke-width="1.5" fill="none" style="color:var(--dimmer)"/></svg></td>
+          <td class="ts">16:08:02Z</td>
+          <td class="note">Standing by.</td>
+        </tr>
+        <tr>
+          <td colspan="3" class="quiet quietrow">… idle — no tokens spent while nothing happens …</td>
+        </tr>
+        <tr>
+          <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h4l2-9 2 18 2-13 2 4h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" style="color:var(--wake)"/></svg></td>
+          <td class="ts">16:08:30Z</td>
+          <td><span class="heard">HEARD</span> <span class="repo">acme/dsh-radar</span> <span class="sys">— 0★, 2m old</span></td>
+        </tr>
+        <tr>
+          <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h4l2-9 2 18 2-13 2 4h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" style="color:var(--wake)"/></svg></td>
+          <td class="ts">16:09:05Z</td>
+          <td><span class="heard">HEARD</span> <span class="repo">beta/dsh-lantern</span> <span class="sys">— logged to ideas.ndjson</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <div class="caption">
+    <div><b>no cron</b> — the agent sleeps until the stream speaks</div>
+    <div><b>no busy-poll</b> — polling is host-side, silence costs nothing</div>
+    <div><b>no human</b> — watches armed from profile config alone</div>
+  </div>
+</div>
+</body>
+</html>

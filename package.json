@@ -1,7 +1,7 @@
 {
-  "name": "dsh-watch",
-  "description": "Background stream listeners that wake the DeepSeek Harness agent — put a watch on a command or file and receive new lines as in-session notices. The harness analog of Claude Code's Monitor tool, built on the first-class jobs subsystem.",
-  "version": "0.1.1",
+  "name": "@dshworks/dsh-watch",
+  "description": "Background stream listeners that wake the DeepSeek Harness agent \u2014 put a watch on a command or file and receive new lines as in-session notices. Ships a daemon host so a watcher can run unattended for weeks.",
+  "version": "0.2.0",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -11,18 +11,33 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
+    "./daemon": {
+      "types": "./lib/types/daemon.d.ts",
+      "default": "./lib/daemon.js"
+    },
     "./core": "./lib/core.js",
     "./package.json": "./package.json"
   },
   "files": [
     "lib",
+    "recipes",
     "cordis.patch.yml",
+    "llms.txt",
     "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dshworks/dsh-watch.git"
+  },
+  "homepage": "https://github.com/dshworks/dsh-watch#readme",
+  "bugs": {
+    "url": "https://github.com/dshworks/dsh-watch/issues"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "vitest run"
@@ -39,6 +54,7 @@
     "dsh-plugin",
     "monitor",
     "watcher",
+    "daemon",
     "background-jobs",
     "notifications",
     "tail"
@@ -57,9 +73,7 @@
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "vitest": "^3.2.4"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
+  "engines": {
+    "node": ">=20"
   }
 }
