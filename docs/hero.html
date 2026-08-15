@@ -40,12 +40,12 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     background: var(--bg);
-    font: 13.5px/1.7 ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+    font: 15px/1.72 ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
     -webkit-font-smoothing: antialiased;
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh;
   }
-  #hero { width: 700px; padding: 30px; }
+  #hero { width: 660px; padding: 26px; }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -89,7 +89,7 @@
   .quietrow { padding: 6px 0 6px 34px; }
   .caption { margin-top: 16px; padding: 0 6px; }
   .caption div {
-    color: var(--dim); font-size: 12px; letter-spacing: .01em;
+    color: var(--dim); font-size: 13px; letter-spacing: .01em;
     padding: 2.5px 0 2.5px 16px; position: relative;
   }
   .caption div::before {
@@ -110,7 +110,7 @@
     <div class="body">
       <table>
         <tr>
-          <td colspan="3" class="cmdrow"><span class="prompt">$</span> <span class="cmd">dsh</span> <span class="flag">--profile</span> <span class="cmd">watcher</span> <span class="sys">| tee -a watcher.log</span></td>
+          <td colspan="3" class="cmdrow"><span class="prompt">$</span> <span class="cmd">dsh</span> <span class="flag">--profile</span> <span class="cmd">watcher</span> <span class="sys">| tee -a log</span></td>
         </tr>
         <tr>
           <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h16" stroke="currentColor" stroke-width="1.5" fill="none" style="color:var(--dimmer)"/></svg></td>
@@ -133,7 +133,7 @@
         <tr>
           <td class="gutter"><svg class="wave" viewBox="0 0 16 22"><path d="M0 11h4l2-9 2 18 2-13 2 4h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" style="color:var(--wake)"/></svg></td>
           <td class="ts">16:09:05Z</td>
-          <td><span class="heard">HEARD</span> <span class="repo">beta/dsh-lantern</span> <span class="sys">— logged to ideas.ndjson</span></td>
+          <td><span class="heard">HEARD</span> <span class="repo">beta/dsh-lantern</span> <span class="sys">→ ideas.ndjson</span></td>
         </tr>
       </table>
     </div>

@@ -1,6 +1,6 @@
 <table>
 <tr>
-<td width="44%" valign="top">
+<td width="40%" valign="top">
 
 # dsh-watch
 
@@ -8,14 +8,13 @@ English | [中文](README.zh.md)
 
 ### Put a watch on a stream. The agent gets woken by what it says — even while idle. Even with nobody there.
 
-The stock jobs subsystem tells an agent when work *finishes*. `dsh-watch`
-tells it when something *says* anything: arm a listener on a long-running
-command or a growing file, and new lines — filtered by a pattern, batched
-per tick, bounded in bytes — arrive as in-session notices.
+The stock jobs subsystem says when work *finishes*. `dsh-watch` says when
+something *speaks*: arm a listener on a command or a growing file, and new
+lines arrive as filtered, batched, byte-bounded notices.
 
 Then take the human out. Declare the watches in profile config, mount the
-daemon host, and you have an agent that boots, sits idle at zero cost, and
-wakes for weeks on whatever its streams say.
+daemon, and the agent boots, idles at zero cost, and wakes for weeks on
+whatever its streams say.
 
 [![ci](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@dshworks/dsh-watch?color=4D6BFE)](https://www.npmjs.com/package/@dshworks/dsh-watch)
@@ -23,9 +22,9 @@ wakes for weeks on whatever its streams say.
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 </td>
-<td width="56%" valign="top">
+<td width="60%" valign="top">
 
-<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="A terminal running dsh --profile watcher: the daemon comes up, reports Standing by, stays idle spending nothing, then two HEARD lines as the feed announces newly published repositories" width="460">
+<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="A terminal running dsh --profile watcher: the daemon comes up, reports Standing by, stays idle spending nothing, then two HEARD lines as the feed announces newly published repositories" width="100%">
 
 </td>
 </tr>

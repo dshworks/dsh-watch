@@ -1,6 +1,6 @@
 <table>
 <tr>
-<td width="44%" valign="top">
+<td width="40%" valign="top">
 
 # dsh-watch
 
@@ -8,12 +8,12 @@
 
 ### 给数据流挂一个监听。它说话，agent 就醒 —— 哪怕正在空闲，哪怕现场没有人。
 
-自带的 jobs 子系统只告诉 agent 任务**结束**了。`dsh-watch` 告诉它有东西**开口**了：
-给长跑命令或持续增长的文件挂一个监听器，新出现的行按 pattern 过滤、按 tick 合批、
-按字节封顶，作为会话内通知送达。
+自带的 jobs 子系统只说任务**结束**了。`dsh-watch` 说有东西**开口**了：
+给长跑命令或持续增长的文件挂一个监听器，新出现的行经过滤、合批、字节封顶后，
+作为会话内通知送达。
 
-然后把人撤掉。把监听写进 profile 配置、挂上 daemon 宿主，你就得到一个开机自启、
-空闲时零成本静默、连续数周被数据流唤醒的 agent。
+然后把人撤掉。把监听写进 profile 配置、挂上 daemon，agent 就会开机自启、
+空闲时零成本静默、连续数周被数据流唤醒。
 
 [![ci](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/dshworks/dsh-watch/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@dshworks/dsh-watch?color=4D6BFE)](https://www.npmjs.com/package/@dshworks/dsh-watch)
@@ -21,9 +21,9 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 </td>
-<td width="56%" valign="top">
+<td width="60%" valign="top">
 
-<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="终端里运行 dsh --profile watcher：daemon 启动、报告 Standing by、随后静默空闲不花一分钱，接着在 feed 播报新仓库时打出两行 HEARD" width="460">
+<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="终端里运行 dsh --profile watcher：daemon 启动、报告 Standing by、随后静默空闲不花一分钱，接着在 feed 播报新仓库时打出两行 HEARD" width="100%">
 
 </td>
 </tr>
