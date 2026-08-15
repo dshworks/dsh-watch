@@ -24,7 +24,7 @@ whatever its streams say.
 </td>
 <td width="60%" valign="top">
 
-<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png?v=0.2.0" alt="A terminal running dsh --profile watcher: the daemon comes up, reports Standing by, sits idle spending nothing, then hears 53 newly published repositories at once and logs the eleven it kept, each with the dshworks repo it belongs in" width="100%">
+<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="A terminal running dsh --profile watcher: the daemon comes up, reports Standing by, sits idle spending nothing, then hears 53 newly published repositories at once and logs the eleven it kept, each with the dshworks repo it belongs in" width="100%">
 
 </td>
 </tr>

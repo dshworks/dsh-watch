@@ -23,7 +23,7 @@
 </td>
 <td width="60%" valign="top">
 
-<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png?v=0.2.0" alt="终端里运行 dsh --profile watcher：daemon 启动、报告 Standing by、随后静默空闲不花一分钱，接着一次听到 53 个新发布的仓库，并记下留用的 11 个及各自归属的 dshworks 仓库" width="100%">
+<img src="https://raw.githubusercontent.com/dshworks/dsh-watch/main/docs/watch-dark.png" alt="终端里运行 dsh --profile watcher：daemon 启动、报告 Standing by、随后静默空闲不花一分钱，接着一次听到 53 个新发布的仓库，并记下留用的 11 个及各自归属的 dshworks 仓库" width="100%">
 
 </td>
 </tr>
