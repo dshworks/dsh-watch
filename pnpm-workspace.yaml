@@ -1,0 +1,4 @@
+# pnpm >= 11 reads build-approval settings here, not from package.json.
+# vitest pulls esbuild, whose postinstall fetches its native binary.
+allowBuilds:
+  esbuild: true
