@@ -228,6 +228,19 @@ wake-on-match while idle → disarm via stock `job_kill` → silence after
 disarm (2026-08-14), and boot → standing brief → idle → woken twice by an
 unattended feed, ~1.6 s from write to reply (2026-08-15).
 
+Through `0.1.0-rc.8`, checked at the source rather than re-run.
+`@deepseek-ai/dsh-tools` — the seam every watch is installed and fired through
+— has a byte-identical `src/` in rc.7 and rc.8. `@deepseek-ai/dsh-llm` did
+change, additively: an `interruptedBlocks()` assembler for cancelled streams,
+image content, and a retry default raised from 2 to 5. Nothing removed, so
+nothing here breaks; the raised retry default is worth knowing if you were
+timing a standing watch's failure budget.
+
+One rc.8 rename to know even though nothing here passes it:
+`SubagentReportDelivery` dropped `'wakeup'` for `'next-step'`, which steers the
+parent rather than waking it. dsh-watch wakes its *owner* through the tools
+seam, not through the subagent report path, so the rename does not reach it.
+
 ## Relation to neighbors
 
 - **Stock `dsh-tool-jobs`** notifies on job *completion*; dsh-watch notifies
