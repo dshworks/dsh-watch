@@ -1,0 +1,75 @@
+# A new dsh release should turn this repo red, not quietly uninstall it.
+#
+# dsh ships prereleases only, and npm semver never lets a prerelease satisfy a
+# caret with a different version tuple. Every release therefore moves the whole
+# `@deepseek-ai/dsh-*` line outside any range we have already written, and
+# `npm i <this plugin>` beside current dsh fails with ERESOLVE. It happened on
+# 2026-08-21 and nobody noticed until 2026-09-04, because no test installs the
+# published plugin next to the published harness.
+#
+# The check reads npm, so it fails loudly rather than silently: a red scheduled
+# run notifies nobody, and an issue does.
+name: dsh-release-watch
+
+on:
+  schedule:
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths: ['package.json', 'scripts/check-dsh-release.mjs', '.github/workflows/dsh-release-watch.yml']
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm install --no-audit --no-fund
+
+      - id: check
+        run: |
+          set +e
+          node scripts/check-dsh-release.mjs > report.md
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+          cat report.md
+          set -e
+
+      # A pull request wants the answer in its own checks, not in an issue.
+      - if: github.event_name == 'pull_request' && steps.check.outputs.status != '0'
+        run: exit 1
+
+      - if: github.event_name != 'pull_request' && steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            if [ "${{ steps.check.outputs.status }}" = "2" ]; then
+              echo "The daily dsh release check could not finish."
+            else
+              echo "A published dsh version no longer satisfies this plugin's peer ranges."
+              echo "Installing this plugin beside current dsh fails with \`ERESOLVE\`."
+              echo
+              echo "Fix: OR the new line into every harness peer range in \`package.json\`,"
+              echo "re-run the install proof, then publish — a fix on main that never"
+              echo "reaches npm leaves every user broken."
+            fi
+            echo
+            cat report.md
+          } > issue.md
+          # `gh issue list --label` errors on a label that does not exist yet,
+          # which would swallow the very first alert.
+          gh label create dsh-release --color B60205 --force \
+            --description "A dsh release moved out from under this plugin"
+          open=$(gh issue list --label dsh-release --state open --limit 1 --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file issue.md
+          else
+            gh issue create --title "A dsh release moved out from under this plugin" --label dsh-release --body-file issue.md
+          fi
