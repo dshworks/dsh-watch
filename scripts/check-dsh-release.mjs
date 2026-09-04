@@ -97,9 +97,13 @@ try {
   process.exit(2)
 }
 
+// Into a temp dir, not the repo root. `npm pack` leaves the tarball where you
+// point it, and a stray .tgz beside package.json is one `git add -A` away from
+// being committed — which is how these sweeps stage everything.
 let tarball
+const packDir = mkdtempSync(join(tmpdir(), 'dsh-release-pack-'))
 try {
-  tarball = join(ROOT, run('npm', ['pack', '--silent', '--ignore-scripts'], ROOT).trim().split('\n').pop())
+  tarball = join(packDir, run('npm', ['pack', '--silent', '--ignore-scripts', '--pack-destination', packDir], ROOT).trim().split('\n').pop())
 } catch (error) {
   console.error(`could not pack this tree: ${error.message}`)
   console.log(report.join('\n'))
