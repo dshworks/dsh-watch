@@ -6,7 +6,16 @@ const CONFIG = { brief: 'You are the ecosystem watcher.', flushIntervalMs: 300_0
 /** Build a stub host context with the three services the daemon injects. */
 function makeCtx({ services = {} } = {}) {
   const captured = { effects: [], listeners: new Map(), created: [], flushes: 0, errors: [] }
-  const session = { seq: 0, events: [], header: { id: 'session-test' } }
+  // Production shape since dsh 0.1.2-alpha.4: `snapshotEvents(fromSeq)`, no
+  // `events` array. A double that keeps the old property is weaker than the
+  // thing it stands in for, and would have stayed green through the outage.
+  const log = []
+  const session = {
+    seq: 0,
+    log,
+    snapshotEvents: (fromSeq = 0) => log.filter(e => e.seq >= fromSeq),
+    header: { id: 'session-test' },
+  }
   const agent = {
     session,
     whenIdle: async () => {},
@@ -35,7 +44,7 @@ function makeCtx({ services = {} } = {}) {
 
 /** Append one assistant message to the stub session log. */
 function say(session, text) {
-  session.events.push({ seq: session.seq++, type: 'assistant/message', data: { message: { content: [{ type: 'text', text }] } } })
+  session.log.push({ seq: session.seq++, type: 'assistant/message', data: { message: { content: [{ type: 'text', text }] } } })
 }
 
 let written
@@ -62,6 +71,29 @@ describe('registration', () => {
     expect(vi.getTimerCount()).toBeGreaterThan(0)
     for (const dispose of captured.effects) dispose()
     expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+describe('eventsSince', () => {
+  const { eventsSince } = internals
+  const event = seq => ({ seq, type: 'assistant/message' })
+
+  it('reads the accessor dsh 0.1.2 exposes, and honours fromSeq', () => {
+    const log = [event(0), event(1), event(2)]
+    const session = { snapshotEvents: (from = 0) => log.filter(e => e.seq >= from) }
+    expect(eventsSince(session, 1)).toEqual([event(1), event(2)])
+  })
+
+  it('still reads the array dsh 0.1.1-rc.2 and earlier exposed', () => {
+    const events = [event(0), event(1)]
+    expect(eventsSince({ events }, 0)).toBe(events)
+  })
+
+  it('throws rather than journal silence when a session offers neither', () => {
+    // The failure this guards against is not an exception, it is a daemon
+    // that runs for weeks writing nothing because a `?? []` swallowed a
+    // renamed property.
+    expect(() => eventsSince({ seq: 0 }, 0)).toThrow(/snapshotEvents/)
   })
 })
 
