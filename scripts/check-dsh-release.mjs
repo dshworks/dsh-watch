@@ -26,6 +26,8 @@ import { mkdtempSync, readFileSync, readdirSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+// `--tree-only`: check what this branch would publish, and nothing else.
+const PR_ONLY = process.argv.includes('--tree-only')
 const ROOT = new URL('..', import.meta.url).pathname
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const report = []
@@ -105,7 +107,15 @@ try {
 }
 
 check([`@deepseek-ai/dsh@${latest}`, tarball], `this tree beside dsh ${latest}`)
-check([`@deepseek-ai/dsh@${latest}`, `${pkg.name}@latest`], `published ${pkg.name} beside dsh ${latest}`)
+const treeFailed = failed
+
+// On a pull request only THIS TREE can be green: the published package is by
+// definition still the broken one on the very PR that fixes it, and a check
+// that is red on its own fix is a check people switch off. The published half
+// belongs to the scheduled run, which is also the only place it can clear.
+if (!PR_ONLY) {
+  check([`@deepseek-ai/dsh@${latest}`, `${pkg.name}@latest`], `published ${pkg.name} beside dsh ${latest}`)
+}
 
 console.log(report.join('\n'))
-process.exit(failed ? 1 : 0)
+process.exit((PR_ONLY ? treeFailed : failed) ? 1 : 0)

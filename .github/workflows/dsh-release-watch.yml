@@ -33,10 +33,14 @@ jobs:
           node-version: 24
       - run: npm install --no-audit --no-fund
 
+      # `--tree-only` on a pull request: the published package is still the
+      # broken one on the very PR that fixes it, so gating a PR on it would
+      # make this check red on its own fix. The scheduled run owns that half —
+      # it is also the only run that can ever see it clear.
       - id: check
         run: |
           set +e
-          node scripts/check-dsh-release.mjs > report.md
+          node scripts/check-dsh-release.mjs ${{ github.event_name == 'pull_request' && '--tree-only' || '' }} > report.md
           echo "status=$?" >> "$GITHUB_OUTPUT"
           cat report.md
           set -e
