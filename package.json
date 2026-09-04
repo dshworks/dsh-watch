@@ -1,6 +1,6 @@
 {
   "name": "@dshworks/dsh-watch",
-  "description": "Background stream listeners that wake the DeepSeek Harness agent \u2014 put a watch on a command or file and receive new lines as in-session notices. Ships a daemon host so a watcher can run unattended for weeks.",
+  "description": "Background stream listeners that wake the DeepSeek Harness agent — put a watch on a command or file and receive new lines as in-session notices. Ships a daemon host so a watcher can run unattended for weeks.",
   "version": "0.2.0",
   "license": "MIT",
   "type": "module",
@@ -64,13 +64,13 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6 || ^0.1.1-rc.1 || ^0.1.2-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6 || ^0.1.1-rc.1 || ^0.1.2-rc.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-llm": "^0.1.0-rc.6 || ^0.1.1-rc.1 || ^0.1.2-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6 || ^0.1.1-rc.1 || ^0.1.2-rc.1",
     "vitest": "^3.2.4"
   },
   "engines": {
