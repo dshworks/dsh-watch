@@ -63,14 +63,20 @@ function harnessVersions(dir) {
   return seen
 }
 
-/** Install `specs` together and assert one version of every harness package. */
-function check(specs, label) {
+/**
+ * Install `specs` together and assert one version of every harness package.
+ *
+ * `advisory` reports without failing: the ahead-of-the-tag look below is a
+ * forecast, and a repo cannot act on it today (see the note there), so turning
+ * it red would only teach people to ignore a red check.
+ */
+function check(specs, label, advisory = false) {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-release-'))
   try {
     run('npm', ['init', '-y'], dir)
     run('npm', ['install', '--no-audit', '--no-fund', '--ignore-scripts', ...specs], dir)
   } catch (error) {
-    failed = true
+    failed = failed || !advisory
     const out = `${error.stdout ?? ''}${error.stderr ?? ''}`
     const why = out.split('\n').filter((l) => /npm error/.test(l)).slice(0, 8).join('\n')
     report.push(`- FAIL  ${label} — install refused\n\n\`\`\`\n${why}\n\`\`\`\n`)
@@ -81,17 +87,24 @@ function check(specs, label) {
     report.push(`- ok    ${label} — one version of every harness package`)
     return
   }
-  failed = true
+  failed = failed || !advisory
   const lines = split.map(([name, versions]) => `    @deepseek-ai/${name}: ${[...versions].sort().join(', ')}`)
   report.push(
     `- FAIL  ${label} — the plugin and the host resolve different copies:\n\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n`,
   )
 }
 
+// DSH_VERSION proves the tree against a version that is published but not
+// tagged. npm ships new tuples on `alpha` for days before `latest` moves, and
+// the day it moves every range written against the old tuple stops resolving
+// at once — so the only way to widen a range BEFORE the outage is to install
+// against the version that is coming. Unset, this checks what users get.
 let latest
 try {
-  latest = run('npm', ['view', '@deepseek-ai/dsh', 'dist-tags.latest'], ROOT).trim()
-  report.push(`dsh \`latest\` on npm: **${latest}**\n`)
+  latest = process.env.DSH_VERSION?.trim()
+    || run('npm', ['view', '@deepseek-ai/dsh', 'dist-tags.latest'], ROOT).trim()
+  const how = process.env.DSH_VERSION ? 'DSH_VERSION' : '`latest` on npm'
+  report.push(`dsh ${how}: **${latest}**\n`)
 } catch (error) {
   console.error(`could not read dsh dist-tags: ${error.message}`)
   process.exit(2)
@@ -119,6 +132,33 @@ const treeFailed = failed
 // belongs to the scheduled run, which is also the only place it can clear.
 if (!PR_ONLY) {
   check([`@deepseek-ai/dsh@${latest}`, `${pkg.name}@latest`], `published ${pkg.name} beside dsh ${latest}`)
+}
+
+// Ahead of the tag.
+//
+// npm serves new tuples on `alpha` for days before `latest` moves, and the day
+// it moves every range written against the old tuple stops resolving at once.
+// This asks that question early so the bump is scheduled rather than
+// discovered -- but only reports, because the answer cannot be acted on yet:
+// these are peerDependencies, npm installs the HIGHEST satisfying version, and
+// simply OR-ing the coming line in makes the plugin pull 0.1.5 beside a 0.1.2
+// host. Measured, not assumed: widening the range turned this very check red
+// against `latest`. The range has to move WITH the tag, so what this buys is
+// the warning, not the fix.
+if (!PR_ONLY) {
+  let ahead
+  try {
+    ahead = JSON.parse(run('npm', ['view', '@deepseek-ai/dsh', 'versions', '--json'], ROOT)).at(-1)
+  } catch { ahead = null }
+  if (ahead && ahead !== latest) {
+    report.push(`\nnpm is also serving **${ahead}**, ahead of the tag:\n`)
+    check([`@deepseek-ai/dsh@${ahead}`, tarball], `this tree beside dsh ${ahead} (advisory)`, true)
+    report.push(
+      `\nAdvisory only. Do not widen the range to fix it -- these are peerDependencies and npm`
+      + ` installs the highest satisfying version, so adding ${ahead}'s line makes this plugin pull`
+      + ` it beside a ${latest} host. Bump when the tag moves.\n`,
+    )
+  }
 }
 
 console.log(report.join('\n'))
