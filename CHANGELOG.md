@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.2 — 2026-09-17
+
+Installs beside dsh 0.1.5 again.
+
+- **Peer ranges add `^0.1.5-rc.1`.** dsh `latest` moved to 0.1.5-rc.2 on
+  2026-09-10, and npm never lets a prerelease satisfy a caret with a
+  different version tuple, so 0.2.1 resolved its own 0.1.2-rc.1 copy of 15
+  harness packages beside the host's 0.1.5 ones: no error, two harnesses.
+  No 0.1.6 line — peer deps resolve to the highest match, so naming the
+  alpha line would pull it in beside a 0.1.5 host.
+- **Checked against the 0.1.5 API, not only the suite.** Every harness
+  surface the plugin and daemon touch is unchanged in the 0.1.5 type defs.
+  The session log is format v3: the journal test double now carries
+  `system/message` heads and `assistant/attempt` records (no
+  `data.message`), and the journal ignores both. Mutation-checked.
+- The lockfile had tested against dsh 0.1.0-rc.6 all along (CI installs
+  without it); it now pins 0.1.5-rc.2.
+
+## 0.2.1 — 2026-09-04
+
+- Peer ranges accept dsh 0.1.2-rc.1.
+- The daemon journal reads `Session.snapshotEvents()`; dsh 0.1.2-alpha.4
+  removed the `events` array, which had left the journal silent.
+- `scripts/check-dsh-release.mjs` and a daily workflow that opens an issue
+  when a dsh release no longer resolves beside this plugin.
+
 ## 0.2.0 — 2026-08-15
 
 The watcher grows a body. First npm release, as `@dshworks/dsh-watch`.
