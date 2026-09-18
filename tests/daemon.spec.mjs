@@ -169,6 +169,30 @@ describe('the operator journal', () => {
     expect(written.filter(line => !line.includes(' up — session '))).toEqual([])
   })
 
+  it('reads a dsh 0.1.5 (log format v3) period: system heads and failed attempts are not closing text', async () => {
+    // v3 writes the system prompt into the log as a `system/message` surface
+    // event before each request whose prompt changed, and records a model
+    // attempt that committed no message as `assistant/attempt` — which carries
+    // a `stream` and NO `data.message`. A period can end on both, when the last
+    // step's request fails after its prompt was replaced.
+    const { ctx, captured, agent, session } = makeCtx()
+    apply(ctx, CONFIG)
+    await vi.waitFor(() => expect(agent.followup).toHaveBeenCalledTimes(1))
+    const append = (type, data) => session.log.push({ seq: session.seq++, type, data })
+    const system = text => append('system/message', { message: { role: 'system', content: [{ type: 'text', text }] } })
+    const attempt = () => append('assistant/attempt', { turn: 1, step: 2, stream: [] })
+    append('step/start', { turn: 1, step: 1 })
+    system('You are dsh.')
+    say(session, 'HEARD acme/dsh-radar')
+    append('step/start', { turn: 1, step: 2 })
+    system('You are dsh. A standing watch is armed.')
+    attempt()
+    captured.listeners.get('agent/status')({ agent, status: 'idle' })
+    expect(written).toHaveLength(2)
+    expect(written[1]).toContain('HEARD acme/dsh-radar')
+    expect(written[1]).not.toContain('You are dsh')
+  })
+
   it('indents continuation lines so a multi-line report stays one journal entry', async () => {
     const { ctx, captured, agent, session } = makeCtx()
     apply(ctx, CONFIG)
