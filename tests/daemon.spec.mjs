@@ -29,7 +29,7 @@ function makeCtx({ services = {} } = {}) {
         return { agent }
       },
     },
-    agentDefaultModel: { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-v4-pro' }) },
+    agentDefaultModel: { currentSelection: () => ({ provider: 'deepseek', model: 'deepseek-flash' }) },
     sessions: { flush: async () => void captured.flushes++ },
     ...services,
   }
@@ -102,7 +102,7 @@ describe('the standing session', () => {
     const { ctx, captured, agent } = makeCtx()
     apply(ctx, CONFIG)
     await vi.waitFor(() => expect(agent.followup).toHaveBeenCalledTimes(1))
-    expect(captured.created[0].agentOptions).toEqual({ provider: 'deepseek', model: 'deepseek-v4-pro' })
+    expect(captured.created[0].agentOptions).toEqual({ provider: 'deepseek', model: 'deepseek-flash' })
     expect(captured.created[0].sessionId).toMatch(/^session-/)
     const message = agent.followup.mock.calls[0][0]
     expect(message.content[0].text).toBe(CONFIG.brief)
