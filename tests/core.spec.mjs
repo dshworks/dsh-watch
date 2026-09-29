@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { capBytes, chopFileWindow, compileFilter, createBacklog, createLineBuffer, createWakeBudget, formatNotice } from '../lib/core.js'
+import { capBytes, chopFileWindow, compileFilter, createLineBuffer, createWakeBudget, formatNotice } from '../lib/core.js'
 
 describe('createLineBuffer', () => {
   it('assembles lines split across chunks', () => {
@@ -134,32 +134,6 @@ describe('formatNotice', () => {
   it('pluralizes multi-line batches', () => {
     const { text } = formatNotice('dev', 'watch-2', ['a', 'b'], 4096)
     expect(text).toContain('2 lines:')
-  })
-})
-
-describe('createBacklog', () => {
-  it('drains what was pushed, once', () => {
-    const backlog = createBacklog(1024)
-    backlog.push('one')
-    backlog.push('two')
-    expect(backlog.drain()).toBe('one\ntwo')
-    expect(backlog.drain()).toBe('')
-  })
-
-  it('drops oldest lines beyond the byte budget and says so', () => {
-    const backlog = createBacklog(1024)
-    // Cross the budget so early lines are evicted.
-    for (let i = 0; i < 60; i++) backlog.push(`line-${i}-${'x'.repeat(30)}`)
-    const out = backlog.drain()
-    expect(out).toMatch(/^\[backlog trimmed: \d+ older line\(s\) dropped\]\n/)
-    expect(out).not.toContain('line-0-')
-    expect(out).toContain('line-59-')
-  })
-
-  it('always retains the newest line even when it alone exceeds the budget', () => {
-    const backlog = createBacklog(1024)
-    backlog.push('x'.repeat(5000))
-    expect(backlog.drain()).toContain('x'.repeat(5000))
   })
 })
 

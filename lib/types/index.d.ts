@@ -30,6 +30,5 @@ export declare function apply(ctx: unknown, config: {
   wakeRefillMs: number
   defaultMaxEvents: number
   maxListenersPerOwner: number
-  backlogBytes: number
   autoArm: StandingWatch[]
 }): void

@@ -193,6 +193,29 @@ describe('the operator journal', () => {
     expect(written[1]).not.toContain('You are dsh')
   })
 
+  it('reads a dsh 0.1.7 (log format v4) period: tool-role results and developer messages are not closing text', async () => {
+    // v4 records a tool result as its own tool-role message (`tool/result`,
+    // no longer a user-role block) and tool-set changes as `developer/message`.
+    // Both carry `data.message.content` text blocks, so only the event type
+    // keeps them out of the journal.
+    const { ctx, captured, agent, session } = makeCtx()
+    apply(ctx, CONFIG)
+    await vi.waitFor(() => expect(agent.followup).toHaveBeenCalledTimes(1))
+    const append = (type, data) => session.log.push({ seq: session.seq++, type, data })
+    say(session, 'HEARD acme/dsh-radar; checking it.')
+    append('tool/result', {
+      turn: 1,
+      step: 2,
+      message: { role: 'tool', source: { kind: 'tool', callId: 'call-1' }, toolCallId: 'call-1', content: [{ type: 'text', text: 'README of acme/dsh-radar' }] },
+    })
+    append('developer/message', { turn: 1, step: 3, message: { role: 'developer', source: { kind: 'tool-registry' }, content: [{ type: 'text', text: 'tools added: watch' }] } })
+    captured.listeners.get('agent/status')({ agent, status: 'idle' })
+    expect(written).toHaveLength(2)
+    expect(written[1]).toContain('HEARD acme/dsh-radar')
+    expect(written[1]).not.toContain('README of')
+    expect(written[1]).not.toContain('tools added')
+  })
+
   it('indents continuation lines so a multi-line report stays one journal entry', async () => {
     const { ctx, captured, agent, session } = makeCtx()
     apply(ctx, CONFIG)

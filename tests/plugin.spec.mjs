@@ -17,11 +17,44 @@ const CONFIG = {
   wakeRefillMs: 60_000,
   defaultMaxEvents: 50,
   maxListenersPerOwner: 2,
-  backlogBytes: 65536,
   autoArm: [],
 }
 
-/** Build a stub harness context capturing registrations and job starts. */
+/**
+ * Live agents by session id — the registry `ctx.get('agents').get(id)` reads,
+ * and the one dsh-jobs-local resolves a job owner through.
+ * @type {Map<string, object>}
+ */
+const liveAgents = new Map()
+/** Every message handed to an agent's followup/inject, checked after each test. */
+let delivered = []
+let agentSeq = 0
+
+/**
+ * The source rule dsh 0.1.7's session writer enforces on every durable
+ * message (`assertV4SourceRowAdmission` in session-format-v3-to-v4): a
+ * non-empty, producer-owned `kind`, and never the retired `kind: 'plugin'`
+ * wrapper. Production does not refuse at `followup()`; the JSONL writer
+ * refuses the row later, so the double checks after the test instead.
+ * @param {object} message - a delivered user message.
+ */
+function assertV4Source(message) {
+  const kind = message?.source?.kind
+  if (typeof kind !== 'string' || kind.length === 0 || kind === 'plugin') {
+    throw new Error(`format v4 message requires a producer-owned source kind (got ${JSON.stringify(message?.source)})`)
+  }
+}
+
+/**
+ * Build a stub harness context capturing registrations and job starts.
+ *
+ * The job registry models dsh-jobs 0.1.7: `start(spec)` takes a `JobSpec`
+ * whose `owner` is a session id resolved through the agent registry (an Agent
+ * object throws "has no live agent"), calls `run(job)` with a producer face
+ * carrying the issued id and the output ring's `append`, and reads nothing
+ * back from the hooks but `cancel` and `done`. `job_output` is a consuming
+ * read of that ring, modeled by `read()`.
+ */
 function makeCtx({ shell, initiator, executeResult } = {}) {
   const captured = {
     tools: new Map(),
@@ -51,9 +84,24 @@ function makeCtx({ shell, initiator, executeResult } = {}) {
     systemPrompt: { section: (section) => void captured.sections.push(section) },
     jobs: {
       start: (spec) => {
-        const hooks = spec.run()
-        const id = `watch-${++jobSeq}`
-        captured.jobs.push({ id, spec, hooks })
+        // Preflight, as jobs-local: nothing runs for a refused spec.
+        if (spec.owner !== undefined && (typeof spec.owner !== 'string' || !liveAgents.has(spec.owner))) {
+          throw new Error(`session "${String(spec.owner)}" has no live agent (background job owner must be live)`)
+        }
+        if (typeof spec.kind !== 'string' || spec.kind.length === 0) throw new Error('invalid job kind: expected a non-empty string')
+        if (typeof spec.label !== 'string' || spec.label.length === 0) throw new Error('invalid job label: expected a non-empty string')
+        const id = `${spec.kind}-${++jobSeq}`
+        const ring = []
+        let settled = false
+        const handle = {
+          id,
+          // Writes after settlement log and drop instead of throwing.
+          append: (text) => { if (!settled && text.length > 0) ring.push(text) },
+          updateProgress: () => {},
+        }
+        const hooks = spec.run(handle)
+        void hooks.done.then(() => { settled = true })
+        captured.jobs.push({ id, spec, hooks, read: () => ring.splice(0).join('') })
         return id
       },
     },
@@ -61,7 +109,7 @@ function makeCtx({ shell, initiator, executeResult } = {}) {
     effect: (fn) => void captured.effects.push(fn()),
     get: (service) => {
       if (service === 'shell') return shell
-      if (service === 'agents') return { currentInitiator: () => initiator }
+      if (service === 'agents') return { currentInitiator: () => initiator, get: id => liveAgents.get(id) }
       return undefined
     },
     logger: { warn: (msg) => void captured.warnings.push(msg) },
@@ -69,14 +117,18 @@ function makeCtx({ shell, initiator, executeResult } = {}) {
   return { ctx, captured }
 }
 
-/** A stub owning agent with observable delivery paths. */
+/** A live stub owning agent with observable delivery paths. */
 function makeAgent(status = 'idle') {
-  return {
+  const id = `session-${++agentSeq}`
+  const agent = {
+    id,
     status,
-    session: { id: 'session-1' },
-    followup: vi.fn(),
-    inject: vi.fn(),
+    session: { id },
+    followup: vi.fn(message => void delivered.push(message)),
+    inject: vi.fn(message => void delivered.push(message)),
   }
+  liveAgents.set(id, agent)
+  return agent
 }
 
 /** Invoke the registered watch tool as the model would. */
@@ -89,10 +141,14 @@ let dir
 beforeEach(() => {
   vi.useFakeTimers()
   dir = mkdtempSync(join(tmpdir(), 'watch-'))
+  liveAgents.clear()
+  delivered = []
 })
 afterEach(() => {
   vi.useRealTimers()
   rmSync(dir, { recursive: true, force: true })
+  // A notice the session writer would refuse is a notice nobody reads.
+  for (const message of delivered) assertV4Source(message)
 })
 
 describe('registration', () => {
@@ -216,17 +272,44 @@ describe('file listeners', () => {
     expect(agent.followup).not.toHaveBeenCalled()
   })
 
-  it('readOutput drains the heard-line backlog once', async () => {
+  it('job_output reads the heard lines from the job ring, once', async () => {
+    // dsh 0.1.7 removed the `readOutput` job hook: job_output reads the
+    // registry's output ring, so a heard line that is not appended there is
+    // invisible to job_output even though the notice went out.
     const { ctx, captured } = makeCtx()
     apply(ctx, CONFIG)
     const agent = makeAgent('busy')
     const path = join(dir, 'log')
     writeFileSync(path, '')
-    await callTool(captured, { source: 'file', path }, agent)
-    appendFileSync(path, 'kept for job_output\n')
+    await callTool(captured, { source: 'file', path, pattern: 'kept' }, agent)
+    appendFileSync(path, 'kept for job_output\nfiltered out\nkept again\n')
     vi.advanceTimersByTime(CONFIG.pollIntervalMs)
-    expect(captured.jobs[0].hooks.readOutput()).toBe('kept for job_output')
-    expect(captured.jobs[0].hooks.readOutput()).toBe('')
+    expect(captured.jobs[0].read()).toBe('kept for job_output\nkept again\n')
+    expect(captured.jobs[0].read()).toBe('')
+  })
+
+  it('owns the job by session id and speaks as its own producer', async () => {
+    const { ctx, captured } = makeCtx()
+    apply(ctx, CONFIG)
+    const agent = makeAgent('idle')
+    const path = join(dir, 'log')
+    writeFileSync(path, '')
+    await callTool(captured, { source: 'file', path, label: 'log' }, agent)
+    // dsh-jobs 0.1.7: the owner is a SessionId, not the Agent.
+    expect(captured.jobs[0].spec.owner).toBe(agent.id)
+    appendFileSync(path, 'heard\n')
+    vi.advanceTimersByTime(CONFIG.pollIntervalMs)
+    // Session format v4 refuses the retired `kind: 'plugin'` wrapper.
+    expect(agent.followup.mock.calls[0][0].source).toEqual({ kind: 'dsh-watch', form: 'notice', summary: 'log: heard' })
+  })
+
+  it('an unowned call starts an unowned job', async () => {
+    const { ctx, captured } = makeCtx()
+    apply(ctx, CONFIG)
+    const path = join(dir, 'log')
+    writeFileSync(path, '')
+    await captured.tools.get('watch').execute({ source: 'file', path }, { signal: new AbortController().signal })
+    expect(captured.jobs[0].spec).not.toHaveProperty('owner')
   })
 })
 
@@ -445,7 +528,7 @@ describe('standing watches', () => {
   it('arms nothing and adds no prompt section when none are configured', () => {
     const { ctx, captured } = makeCtx()
     apply(ctx, CONFIG)
-    expect(captured.listeners.has('agent/session-start')).toBe(false)
+    expect(captured.listeners.has('agent/created')).toBe(false)
     expect(captured.sections.map(s => s.name)).not.toContain('tool:watch:standing')
   })
 
@@ -455,13 +538,13 @@ describe('standing watches', () => {
     const { ctx, captured } = makeCtx()
     apply(ctx, standing([{ source: 'file', path, pattern: 'NEW', label: 'ecosystem' }]))
     const agent = makeAgent('idle')
-    await captured.listeners.get('agent/session-start')({ agent, source: 'fresh' })
+    await captured.listeners.get('agent/created')({ agent, source: 'startup' })
     await vi.waitFor(() => expect(captured.jobs.length).toBe(1))
     // Routed through ctx.tools.execute, so guards, approval, sandbox policy and
     // the shell environment apply exactly as they would to a model-issued call.
     expect(captured.executed[0].name).toBe('watch')
     expect(captured.executed[0].agent).toBe(agent)
-    expect(captured.jobs[0].spec.owner).toBe(agent)
+    expect(captured.jobs[0].spec.owner).toBe(agent.id)
     appendFileSync(path, 'NEW plugin: dsh-something\nunrelated\n')
     vi.advanceTimersByTime(CONFIG.pollIntervalMs)
     expect(agent.followup).toHaveBeenCalledTimes(1)
@@ -481,7 +564,7 @@ describe('standing watches', () => {
   it('skips a subagent, whose setup runs inside its parent initiator boundary', async () => {
     const { ctx, captured } = makeCtx({ initiator: makeAgent('busy') })
     apply(ctx, standing([{ source: 'file', path: join(dir, 'x'), label: 'ecosystem' }]))
-    await captured.listeners.get('agent/session-start')({ agent: makeAgent('idle'), source: 'fresh' })
+    await captured.listeners.get('agent/created')({ agent: makeAgent('idle'), source: 'startup' })
     await Promise.resolve()
     expect(captured.executed).toEqual([])
   })
@@ -492,8 +575,8 @@ describe('standing watches', () => {
     const { ctx, captured } = makeCtx()
     apply(ctx, standing([{ source: 'file', path, label: 'ecosystem' }]))
     const agent = makeAgent('idle')
-    const start = captured.listeners.get('agent/session-start')
-    await start({ agent, source: 'fresh' })
+    const start = captured.listeners.get('agent/created')
+    await start({ agent, source: 'startup' })
     await start({ agent, source: 'resume' })
     await vi.waitFor(() => expect(captured.executed.length).toBe(1))
   })
@@ -501,7 +584,7 @@ describe('standing watches', () => {
   it('logs a rejected standing watch instead of failing the session', async () => {
     const { ctx, captured } = makeCtx({ executeResult: { isError: true, error: { code: 'DENIED' }, content: [{ type: 'text', text: 'guard said no' }] } })
     apply(ctx, standing([{ source: 'command', command: 'tail -f /var/log/x', label: 'ecosystem' }]))
-    await captured.listeners.get('agent/session-start')({ agent: makeAgent('idle'), source: 'fresh' })
+    await captured.listeners.get('agent/created')({ agent: makeAgent('idle'), source: 'startup' })
     await vi.waitFor(() => expect(captured.warnings.length).toBe(1))
     expect(captured.warnings[0]).toContain('guard said no')
     expect(captured.jobs).toEqual([])
@@ -509,8 +592,15 @@ describe('standing watches', () => {
 })
 
 describe('command listeners', () => {
-  /** A stub shell whose process the test scripts. */
-  function makeShell() {
+  /**
+   * A stub shell modeled on dsh-shell 0.1.7. `resolve()` fills defaults the
+   * way bash-local does — `onExpiry` defaults to `'kill'` at a 120 s
+   * `timeoutMs` — and `execute(spec)` is async: the handle is published after
+   * preparation, the deadline is armed unless `onExpiry` is `'none'`, and the
+   * spec's signal kills the process. There is no `start()` any more.
+   * @param {{ failPreparation?: string, prepare?: Promise<void> }} [options]
+   */
+  function makeShell({ failPreparation, prepare } = {}) {
     let settleDone = () => {}
     const proc = {
       status: 'running',
@@ -524,32 +614,89 @@ describe('command listeners', () => {
         const delta = this.deltas.splice(0).join('')
         return { delta, lossy: this.lossyOnce === true ? ((this.lossyOnce = false), true) : false }
       },
-      kill: vi.fn(() => true),
+      observed: { stdout: {}, stderr: {} },
+      kill: vi.fn(() => {
+        if (proc.status !== 'running') return false
+        proc.status = 'killed'
+        proc.signal = 'SIGTERM'
+        settleDone()
+        return true
+      }),
     }
     const shell = {
       resolved: [],
+      executed: 0,
       resolve(request) {
-        this.resolved.push(request)
-        return request
+        const spec = {
+          ...request,
+          workdir: request.workdir ?? '/work',
+          timeoutMs: request.timeoutMs ?? 120_000,
+          onExpiry: request.onExpiry ?? 'kill',
+        }
+        this.resolved.push(spec)
+        return spec
       },
-      start: () => proc,
+      async execute(spec) {
+        if (prepare !== undefined) await prepare
+        if (failPreparation !== undefined) throw new Error(failPreparation)
+        // "@throws on ... caller cancellation before process publication"
+        spec.signal?.throwIfAborted()
+        this.executed++
+        spec.signal?.addEventListener('abort', () => proc.kill(), { once: true })
+        if (spec.onExpiry === 'kill') setTimeout(() => proc.kill(), spec.timeoutMs)
+        return proc
+      },
     }
     return { shell, proc, exit: (code) => {
+      if (proc.status !== 'running') return
+      proc.status = 'completed'
       proc.exitCode = code
       settleDone()
     } }
   }
 
-  it('streams process output lines as notices', async () => {
+  /** Let preparation publish the process, then run one poll tick. */
+  const tick = () => vi.advanceTimersByTimeAsync(CONFIG.pollIntervalMs)
+
+  it('streams process output lines as notices and into the job ring', async () => {
     const { shell, proc } = makeShell()
     const { ctx, captured } = makeCtx({ shell })
     apply(ctx, CONFIG)
     const agent = makeAgent('idle')
     await callTool(captured, { source: 'command', command: 'npm run dev', label: 'dev' }, agent)
     proc.deltas.push('Ready in 120ms\n')
-    vi.advanceTimersByTime(CONFIG.pollIntervalMs)
+    await tick()
     expect(agent.followup).toHaveBeenCalledTimes(1)
     expect(agent.followup.mock.calls[0][0].content[0].text).toContain('Ready in 120ms')
+    expect(captured.jobs[0].read()).toBe('Ready in 120ms\n')
+  })
+
+  it('runs the command with no deadline, so a watch outlives the executor timeout', async () => {
+    // dsh 0.1.7's execute() kills at `timeoutMs` (120 s by default) unless the
+    // request says `onExpiry: 'none'`; 0.1.5's background start() ignored it.
+    const { shell, proc } = makeShell()
+    const { ctx, captured } = makeCtx({ shell })
+    apply(ctx, CONFIG)
+    const agent = makeAgent('idle')
+    await callTool(captured, { source: 'command', command: 'tail -f /var/log/app.log' }, agent)
+    await vi.advanceTimersByTimeAsync(30 * 60_000)
+    expect(shell.resolved[0].onExpiry).toBe('none')
+    expect(proc.kill).not.toHaveBeenCalled()
+    proc.deltas.push('half an hour later\n')
+    await tick()
+    expect(agent.followup.mock.lastCall[0].content[0].text).toContain('half an hour later')
+  })
+
+  it('does not hand the tool call its own signal: a stopped turn leaves the watch armed', async () => {
+    const { shell, proc } = makeShell()
+    const { ctx, captured } = makeCtx({ shell })
+    apply(ctx, CONFIG)
+    const call = new AbortController()
+    await captured.tools.get('watch').execute({ source: 'command', command: 'svc' }, { agent: makeAgent('idle'), signal: call.signal })
+    await tick()
+    call.abort()
+    await tick()
+    expect(proc.kill).not.toHaveBeenCalled()
   })
 
   it('carries a partial line across ticks', async () => {
@@ -559,10 +706,10 @@ describe('command listeners', () => {
     const agent = makeAgent('idle')
     await callTool(captured, { source: 'command', command: 'svc' }, agent)
     proc.deltas.push('half a ')
-    vi.advanceTimersByTime(CONFIG.pollIntervalMs)
+    await tick()
     expect(agent.followup).not.toHaveBeenCalled()
     proc.deltas.push('line\n')
-    vi.advanceTimersByTime(CONFIG.pollIntervalMs)
+    await tick()
     expect(agent.followup.mock.calls[0][0].content[0].text).toContain('half a line')
   })
 
@@ -574,7 +721,7 @@ describe('command listeners', () => {
     await callTool(captured, { source: 'command', command: 'svc' }, agent)
     proc.lossyOnce = true
     proc.deltas.push('survivor\n')
-    vi.advanceTimersByTime(CONFIG.pollIntervalMs)
+    await tick()
     expect(agent.followup.mock.calls[0][0].content[0].text).toContain('some lines were lost')
   })
 
@@ -584,11 +731,13 @@ describe('command listeners', () => {
     apply(ctx, CONFIG)
     const agent = makeAgent('idle')
     await callTool(captured, { source: 'command', command: 'svc' }, agent)
+    await tick()
     proc.deltas.push('final words')
     exit(0)
     const outcome = await captured.jobs[0].hooks.done
     expect(outcome).toEqual({ status: 'completed', detail: 'stream ended (exit code: 0)' })
     expect(agent.followup.mock.calls[0][0].content[0].text).toContain('final words')
+    expect(captured.jobs[0].read()).toBe('final words\n')
   })
 
   it('maps a nonzero exit to failed', async () => {
@@ -596,21 +745,48 @@ describe('command listeners', () => {
     const { ctx, captured } = makeCtx({ shell })
     apply(ctx, CONFIG)
     await callTool(captured, { source: 'command', command: 'svc' }, makeAgent('idle'))
+    await tick()
     exit(3)
     const outcome = await captured.jobs[0].hooks.done
     expect(outcome).toEqual({ status: 'failed', detail: 'stream died (exit code: 3)' })
   })
 
   it('cancel kills the process and settles killed', async () => {
-    const { shell, proc, exit } = makeShell()
+    const { shell, proc } = makeShell()
+    const { ctx, captured } = makeCtx({ shell })
+    apply(ctx, CONFIG)
+    await callTool(captured, { source: 'command', command: 'svc' }, makeAgent('idle'))
+    await tick()
+    captured.jobs[0].hooks.cancel()
+    expect(proc.kill).toHaveBeenCalled()
+    const outcome = await captured.jobs[0].hooks.done
+    expect(outcome).toEqual({ status: 'killed', detail: 'watch disarmed' })
+  })
+
+  it('cancel during preparation settles killed and never spawns', async () => {
+    let release = () => {}
+    const { shell } = makeShell({ prepare: new Promise((res) => { release = res }) })
     const { ctx, captured } = makeCtx({ shell })
     apply(ctx, CONFIG)
     await callTool(captured, { source: 'command', command: 'svc' }, makeAgent('idle'))
     captured.jobs[0].hooks.cancel()
-    expect(proc.kill).toHaveBeenCalled()
-    exit(null)
+    release()
     const outcome = await captured.jobs[0].hooks.done
     expect(outcome).toEqual({ status: 'killed', detail: 'watch disarmed' })
+    expect(shell.executed).toBe(0)
+  })
+
+  it('a command that cannot start settles failed with the reason', async () => {
+    const { shell } = makeShell({ failPreparation: 'sandbox runner unavailable' })
+    const { ctx, captured } = makeCtx({ shell })
+    apply(ctx, CONFIG)
+    const agent = makeAgent('idle')
+    await callTool(captured, { source: 'command', command: 'svc' }, agent)
+    const outcome = await captured.jobs[0].hooks.done
+    expect(outcome).toEqual({ status: 'failed', detail: 'stream failed to start: sandbox runner unavailable' })
+    // The poller went down with it.
+    await tick()
+    expect(agent.followup).not.toHaveBeenCalled()
   })
 
   it('fails loud without the shell capability', async () => {
@@ -648,10 +824,11 @@ describe('guardrails', () => {
     await expect(callTool(captured, { source: 'file', path }, agent)).resolves.toBeTruthy()
   })
 
-  it('tears the armed poller down when the registry rejects the job after run()', async () => {
+  it('arms nothing when the registry refuses the job at preflight', async () => {
+    // dsh-jobs 0.1.7: admission runs before run(), and once run() returns
+    // registration cannot fail — so a refusal never strands a poller.
     const { ctx, captured } = makeCtx()
-    // A registry that runs the producer, then refuses the job.
-    ctx.jobs = { start: (spec) => { spec.run(); throw new Error('job limit reached') } }
+    ctx.jobs = { start: () => { throw new Error('background job limit reached for this owner (limit: 8)') } }
     apply(ctx, CONFIG)
     const agent = makeAgent('idle')
     const path = join(dir, 'log')

@@ -40,6 +40,10 @@ dsh --profile web
 `dsh plugin` forwards to pnpm, so pnpm must be on PATH. Nothing else to
 configure — the `watch` tool is available in the next session.
 
+Needs dsh 0.1.7 or later (the 0.1.7 and 0.2.0 lines). dsh checks the
+plugin's harness peer ranges before it installs anything, so an older host
+refuses it up front instead of loading a plugin written for another API.
+
 ## The tool
 
 ```text
@@ -60,7 +64,7 @@ watch(source: "file", path: "/var/log/app.log", pattern: "ERROR|FATAL")
 
 Every watch is a **first-class background job** (kind `watch`), so the
 standard surface applies unchanged: `job_list` shows armed watches,
-`job_output` drains a watch's line backlog, `job_kill` disarms one,
+`job_output` reads the lines a watch heard, `job_kill` disarms one,
 ownership is session-fenced, and settlement arrives as an ordinary
 completion notice. This plugin adds only the watching — no parallel
 lifecycle, no second registry.
@@ -72,7 +76,7 @@ lifecycle, no second registry.
 | Filtering | Optional JavaScript regex; only matching lines are delivered. Cover failure signatures too — silence is not success |
 | Wake budget | A token bucket per owner: burst `maxConsecutiveWakes`, then one credit back per `wakeRefillMs`. A claimed user message refills it completely |
 | Event budget | Each watch disarms itself after `max_events` notices and settles `completed`; `0` listens indefinitely |
-| Byte bounds | Each complete notice is capped UTF-8-safely, wrapper included; `job_output` holds the bounded backlog with an explicit trim marker when lines were dropped |
+| Byte bounds | Each complete notice is capped UTF-8-safely, wrapper included; heard lines also go to the job's output ring, which `job_output` reads — the registry bounds its retention and flags a read that lost bytes |
 | Truncation honesty | Upstream output loss (`lossy` reads) is surfaced as a marker line, never swallowed |
 | Lifecycle | Process exit flushes the tail, then settles `completed` (exit 0), `failed` (nonzero — a dead watch is a finding, not a silence), or `killed` (signal/disarm). Plugin disposal tears every watch down |
 | Caps | Per-owner armed-watch cap fails the arming call loudly |
@@ -96,7 +100,7 @@ was empty earns a catch-up wake as soon as one comes back. Set
 alive.** `dsh --profile headless` drives one task to quiescence and exits;
 `dsh --profile web` stays up but waits for a browser. So `autoArm` declares
 watches in profile config — armed for the root session at
-`agent/session-start`, routed through the tool registry so they pass the
+`agent/created`, routed through the tool registry so they pass the
 same guards, approval policy, sandbox, and shell environment a model-issued
 call would — and `@dshworks/dsh-watch/daemon` is a ~90-line host that
 creates one agent, seeds a standing brief, holds the process open, and
@@ -169,7 +173,6 @@ Every bound is a validated `Config` field, not a constant.
 | `wakeRefillMs` | `60000` | Milliseconds per restored credit; `0` disables time refill |
 | `defaultMaxEvents` | `50` | Notice budget per watch; `0` means unbounded |
 | `maxListenersPerOwner` | `8` | Armed-watch cap per agent |
-| `backlogBytes` | `65536` | Retained-bytes budget for a watch's `job_output` |
 | `autoArm` | `[]` | Standing watches armed for the root session at boot |
 
 The daemon's own config is `brief` (required), `flushIntervalMs`
@@ -214,7 +217,7 @@ costs the model request it opens, which is why wakes are budgeted.
 ## Development
 
 ```sh
-pnpm install && pnpm test    # 83 tests
+pnpm install && pnpm test    # 91 tests
 ```
 
 Plain ESM JavaScript in `lib/` — nothing builds at install time, so a git
@@ -222,24 +225,29 @@ install has no `allowBuilds` surface. (The *dev* install does: vitest pulls
 esbuild, approved in `pnpm-workspace.yaml`, which is where pnpm ≥ 11 reads
 build settings — the `pnpm` field in `package.json` is silently ignored.)
 
-Beyond the suite, the full lifecycle is verified against live sessions on
-`0.1.0-rc.6` with DeepSeek-V4-Pro: arm → silence on non-matching lines →
-wake-on-match while idle → disarm via stock `job_kill` → silence after
-disarm (2026-08-14), and boot → standing brief → idle → woken twice by an
-unattended feed, ~1.6 s from write to reply (2026-08-15).
+Beyond the suite, harness-touching releases are run against a real dsh: installed with
+`dsh plugin add` into a scratch `DSH_HOME`, then booted as an unattended
+watcher. For 0.2.3 (2026-09-29, `deepseek-flash`, on dsh 0.1.7-rc.2 and
+0.2.0-rc.1) that was:
 
-Through `0.1.0-rc.8`, checked at the source rather than re-run.
-`@deepseek-ai/dsh-tools` — the seam every watch is installed and fired through
-— has a byte-identical `src/` in rc.7 and rc.8. `@deepseek-ai/dsh-llm` did
-change, additively: an `interruptedBlocks()` assembler for cancelled streams,
-image content, and a retry default raised from 2 to 5. Nothing removed, so
-nothing here breaks; the raised retry default is worth knowing if you were
-timing a standing watch's failure budget.
+- standing watches armed at `agent/created`
+- a file notice waking the idle agent, with `job_output` returning the line
+- a command watch speaking 150 s after arming, past the executor's
+  two-minute default deadline
+- `job_kill` disarming it
+- every notice persisted to the v4 session log under the `dsh-watch` source
+  kind
 
-One rc.8 rename to know even though nothing here passes it:
-`SubagentReportDelivery` dropped `'wakeup'` for `'next-step'`, which steers the
-parent rather than waking it. dsh-watch wakes its *owner* through the tools
-seam, not through the subagent report path, so the rename does not reach it.
+`node scripts/check-dsh-release.mjs` repeats the install half daily against
+dsh `latest` (and `next`, as an advisory). It fails when dsh's compatibility
+gate refuses the plugin, or when the plugin puts a package the host already
+supplies into the profile, where it would shadow the host's copy for every
+plugin there.
+
+The suite's doubles model the harness at the version the peer range names,
+and each port is mutation-checked: putting the previous release's call back
+has to turn the suite red. On 0.1.7 the doubles written for 0.1.5 stayed
+green through six real breaks.
 
 ## Relation to neighbors
 
