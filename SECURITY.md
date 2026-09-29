@@ -13,8 +13,10 @@ kinds of local thing:
   removes no check.
 
 Heard lines go to the owning agent as bounded notices and into that watch's
-`job_output` backlog. They are not written anywhere else, and nothing
-leaves the machine.
+job output ring, which `job_output` reads. A notice is an ordinary session
+message: the session log records it, and the agent's next model request
+carries it to the model provider like any other turn. dsh-watch itself
+writes heard lines nowhere else.
 
 ## The two things worth thinking about
 

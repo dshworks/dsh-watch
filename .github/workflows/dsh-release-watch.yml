@@ -1,14 +1,14 @@
-# A new dsh release should turn this repo red, not quietly uninstall it.
+# A new dsh release should turn this repo red, not quietly break the plugin.
 #
-# dsh ships prereleases only, and npm semver never lets a prerelease satisfy a
-# caret with a different version tuple. Every release therefore moves the whole
-# `@deepseek-ai/dsh-*` line outside any range we have already written, and
-# `npm i <this plugin>` beside current dsh fails with ERESOLVE. It happened on
-# 2026-08-21 and nobody noticed until 2026-09-04, because no test installs the
-# published plugin next to the published harness.
+# Users install plugins with `dsh plugin --profile <p> add <spec>`: a
+# compatibility gate checks the harness peer ranges against the running dsh,
+# then pnpm installs into the profile, and any harness import the profile does
+# not physically hold resolves to the host's copy. The check does exactly that
+# against dsh `latest` (and `next` as an advisory), in a scratch DSH_HOME, and
+# fails when the gate refuses the plugin or when the plugin drags a package the
+# host already supplies into the profile. See scripts/check-dsh-release.mjs.
 #
-# The check reads npm, so it fails loudly rather than silently: a red scheduled
-# run notifies nobody, and an issue does.
+# A red scheduled run notifies nobody, so the scheduled run opens an issue.
 name: dsh-release-watch
 
 on:
@@ -25,13 +25,14 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: npm install --no-audit --no-fund
+      # `dsh plugin add` runs pnpm (>= 10 reads pnpm-workspace.yaml).
+      - run: npm install --global pnpm@11
 
       # `--tree-only` on a pull request: the published package is still the
       # broken one on the very PR that fixes it, so gating a PR on it would
@@ -57,11 +58,12 @@ jobs:
             if [ "${{ steps.check.outputs.status }}" = "2" ]; then
               echo "The daily dsh release check could not finish."
             else
-              echo "A published dsh version no longer satisfies this plugin's peer ranges."
-              echo "Installing this plugin beside current dsh fails with \`ERESOLVE\`."
+              echo "Installing this plugin with \`dsh plugin add\` beside current dsh no longer works cleanly:"
+              echo "either the compatibility gate refused it, or the profile now carries a package the host supplies."
               echo
-              echo "Fix: OR the new line into every harness peer range in \`package.json\`,"
-              echo "re-run the install proof, then publish — a fix on main that never"
+              echo "Refused: prove the plugin works on the new dsh (a real session, not only the suite), then"
+              echo "widen every harness peer range to cover it. Shadowed host package: move it from"
+              echo "\`dependencies\` to \`peerDependencies\`. Either way, publish — a fix on main that never"
               echo "reaches npm leaves every user broken."
             fi
             echo

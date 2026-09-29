@@ -39,6 +39,9 @@ dsh --profile web
 `dsh plugin` 会转发给 pnpm，所以 PATH 里要有 pnpm。除此之外不需要配置 ——
 下一个会话里 `watch` 工具就可用了。
 
+需要 dsh 0.1.7 或更新（0.1.7 与 0.2.0 两条线）。dsh 在安装前会先检查插件的 harness
+peer 范围，所以更旧的宿主会直接拒装，而不是加载一个按另一套 API 写的插件。
+
 ## 工具本体
 
 ```text
@@ -58,7 +61,7 @@ watch(source: "file", path: "/var/log/app.log", pattern: "ERROR|FATAL")
 ```
 
 每个监听都是**一等公民后台任务**（kind 为 `watch`），因此标准接口原样适用：
-`job_list` 列出已布防的监听，`job_output` 取出某个监听积压的行，`job_kill` 撤防，
+`job_list` 列出已布防的监听，`job_output` 读出某个监听听到的行，`job_kill` 撤防，
 归属按会话隔离，结束时走普通的完成通知。这个插件只增加"听"这件事 ——
 没有第二套生命周期，也没有第二个注册表。
 
@@ -69,7 +72,7 @@ watch(source: "file", path: "/var/log/app.log", pattern: "ERROR|FATAL")
 | 过滤 | 可选的 JavaScript 正则，只投递命中的行。**失败特征也要写进去 —— 没声音不等于没问题** |
 | 唤醒预算 | 每个 owner 一个令牌桶：先允许 `maxConsecutiveWakes` 次连发，之后每 `wakeRefillMs` 回一个额度。用户消息被领取时直接加满 |
 | 事件预算 | 每个监听在 `max_events` 条通知后自行撤防并以 `completed` 结束；填 `0` 表示一直听下去 |
-| 字节上限 | 每条完整通知按 UTF-8 安全截断（含包装文本）；`job_output` 保留有上限的积压，丢行时带明确的裁剪标记 |
+| 字节上限 | 每条完整通知按 UTF-8 安全截断（含包装文本）；听到的行同时写进任务的输出环，`job_output` 读的就是它 —— 保留多少由注册表限定，丢了字节的读取会被标记出来 |
 | 截断诚实 | 上游输出丢失（`lossy` 读）会作为标记行暴露出来，绝不吞掉 |
 | 生命周期 | 进程退出时先冲刷尾部再结算：`completed`（退出码 0）、`failed`（非零 —— 监听死了是一个发现，不是一段沉默）、`killed`（信号或撤防）。插件卸载会拆掉所有监听 |
 | 上限 | 每个 owner 的布防数量上限，超了就让这次调用**明确失败** |
@@ -87,7 +90,7 @@ watch(source: "file", path: "/var/log/app.log", pattern: "ERROR|FATAL")
 
 **得有人去布防，也得有人让进程活着。** `dsh --profile headless` 跑完一个任务到静默
 就退出；`dsh --profile web` 常驻，但要等浏览器里的人。于是 `autoArm` 把监听声明进
-profile 配置 —— 在 `agent/session-start` 时为根会话布防，并且走工具注册表，
+profile 配置 —— 在 `agent/created` 时为根会话布防，并且走工具注册表，
 因此它要过的守卫、审批策略、沙箱和 shell 环境，跟模型自己发起的调用完全一致 ——
 而 `@dshworks/dsh-watch/daemon` 是一个约 90 行的宿主：创建一个 agent、注入一份常驻
 简报、把进程撑住，并把每个活动区间的收尾文本按 ISO 时间戳写到 stdout 作为运维日志。
@@ -156,7 +159,6 @@ dsh 仓库；watcher 被唤醒、读完、留下 11 个，并说明了另外 42 
 | `wakeRefillMs` | `60000` | 回一个额度所需的毫秒数；`0` 表示不按时间回血 |
 | `defaultMaxEvents` | `50` | 每个监听的通知预算；`0` 表示不限 |
 | `maxListenersPerOwner` | `8` | 每个 agent 的布防数量上限 |
-| `backlogBytes` | `65536` | 单个监听 `job_output` 积压的保留字节预算 |
 | `autoArm` | `[]` | 启动时为根会话布防的常驻监听 |
 
 daemon 自己的配置是 `brief`（必填）、`flushIntervalMs`（`300000`）和 `journal`（`true`）。
@@ -197,17 +199,29 @@ You can arm a watch on a stream with the watch tool: it listens in the backgroun
 ## 开发
 
 ```sh
-pnpm install && pnpm test    # 83 个测试
+pnpm install && pnpm test    # 91 个测试
 ```
 
 `lib/` 里是纯 ESM JavaScript —— 安装时不构建任何东西，所以用 git 装不会碰到
 `allowBuilds`。（**开发**安装会：vitest 会拉 esbuild，在 `pnpm-workspace.yaml` 里放行
 —— pnpm ≥ 11 从那里读构建设置，`package.json` 里的 `pnpm` 字段会被静默忽略。）
 
-除了测试套件，完整生命周期都在 `0.1.0-rc.6` + DeepSeek-V4-Pro 的真实会话里验证过：
-布防 → 不匹配的行保持沉默 → 空闲时命中即唤醒 → 用自带 `job_kill` 撤防 →
-撤防后彻底安静（2026-08-14）；以及启动 → 常驻简报 → 空闲 → 被无人值守的 feed
-唤醒两次，从写入到回复约 1.6 秒（2026-08-15）。
+除了测试套件，涉及 harness 的发布都会在真实 dsh 上跑一遍：用 `dsh plugin add` 装进一个
+临时 `DSH_HOME`，再作为无人值守的监听者启动。0.2.3（2026-09-29，`deepseek-flash`，
+dsh 0.1.7-rc.2 与 0.2.0-rc.1）验证了：
+
+- 常驻监听在 `agent/created` 时布防
+- 文件通知唤醒空闲 agent，`job_output` 读回那一行
+- 命令监听在布防 150 秒后才出声，越过了执行器默认两分钟的期限
+- `job_kill` 撤防
+- 每条通知都以 `dsh-watch` 来源 kind 写进 v4 会话日志
+
+`node scripts/check-dsh-release.mjs` 每天对 dsh `latest`（以及仅作提示的 `next`）重复
+安装这一半。dsh 的兼容性闸门拒装插件，或者插件把宿主已经提供的包带进 profile
+（它会为 profile 里的每个插件遮住宿主那一份）时，检查就会失败。
+
+测试替身按 peer 范围写明的 harness 版本建模，每次移植都做变异检查：把上一版的调用
+放回去，测试套件必须变红。在 0.1.7 上，为 0.1.5 写的替身在六处真实断裂下仍然全绿。
 
 ## 与邻居的关系
 

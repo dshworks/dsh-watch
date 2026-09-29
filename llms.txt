@@ -7,7 +7,9 @@
 > human and no one-shot task.
 
 npm: `@dshworks/dsh-watch` (scoped; the bundle patch's `name` must match it).
-Install: `dsh plugin --profile web add @dshworks/dsh-watch`.
+Install: `dsh plugin --profile web add @dshworks/dsh-watch`. Needs dsh 0.1.7 or
+later (peer range `^0.1.7-alpha.1 || ^0.2.0-rc.1`); dsh's install gate refuses
+it on an older host.
 
 ## The two exports
 
@@ -17,7 +19,7 @@ Install: `dsh plugin --profile web add @dshworks/dsh-watch`.
   kind `watch`, so `job_list`, `job_output`, and `job_kill` are the list,
   read, and disarm surface. Config: `pollIntervalMs`, `maxNoticeBytes`,
   `maxConsecutiveWakes`, `wakeRefillMs`, `defaultMaxEvents`,
-  `maxListenersPerOwner`, `backlogBytes`, `autoArm`.
+  `maxListenersPerOwner`, `autoArm`.
 - `@dshworks/dsh-watch/daemon` — an opt-in host plugin (`brief`,
   `flushIntervalMs`, `journal`) that creates one root agent, seeds a
   standing brief, keeps the process alive, and journals each active
@@ -34,7 +36,18 @@ Install: `dsh plugin --profile web add @dshworks/dsh-watch`.
   60000; `0` disables time refill). A claimed user message refills it.
 - `max_events: 0` and `defaultMaxEvents: 0` mean unbounded, not zero.
 - `autoArm` goes through `ctx.tools.execute()`. Callers must never mint an
-  execution token; the registry assigns it.
+  execution token; the registry assigns it. Standing watches arm at
+  `agent/created` (dsh 0.1.6 removed `agent/session-start`).
+- dsh 0.1.7 job contract: the owner is the agent's session id
+  (`owner: agent.id`), `run(job)` receives the job handle, and heard lines
+  reach `job_output` only through `job.append()` into the output ring.
+- dsh 0.1.7 runs commands through `shell.execute()`, which kills at
+  `timeoutMs` (two minutes by default) unless the request says
+  `onExpiry: 'none'`. A watch always does.
+- Notices carry the producer-owned source `{ kind: 'dsh-watch', form:
+  'notice', summary }`. The v4 session writer refuses the retired
+  `{ kind: 'plugin', plugin }` wrapper, and the failure is silent: no turn,
+  no log row, nothing on stderr.
 - No stock dsh surface hosts a standing agent: `--profile headless` exits
   at quiescence, `--profile web` waits for a browser. That gap is why the
   daemon export exists.

@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.2.3 — 2026-09-29
+
+Runs on dsh 0.1.7 and 0.2.0. 0.2.2 installs on a 0.1.7 host without a
+word (dsh's gate reads `^0.1.5-rc.1` as `>=0.1.5-rc.1 <0.2.0-0`) and then
+does nothing useful: no standing watch arms, and a model-issued `watch`
+fails.
+
+- **Six breaks in the dsh 0.1.7 API, all fixed.**
+  - A job's owner is now a session id. Passing the Agent made every
+    `watch` call throw `session "[object Object]" has no live agent`.
+  - `shell.start()` is gone. Commands now run through `shell.execute()`.
+  - `execute()` kills at `timeoutMs` (two minutes by default) unless the
+    request says `onExpiry: 'none'`, which a watch now always does. A
+    real command watch spoke 150 s after arming and was heard.
+  - The `readOutput` job hook is gone, so `job_output` read nothing. Heard
+    lines now go into the job's output ring via `job.append()`.
+  - `agent/session-start` is gone, so `autoArm` never fired. Standing
+    watches now arm at `agent/created`, still without holding up creation.
+  - The v4 session writer refuses the retired
+    `{ kind: 'plugin', plugin }` message source. Notices now carry
+    `{ kind: 'dsh-watch', form: 'notice', summary }`. With the old wrapper
+    a live run showed the failure is silent: the watch arms, the notice
+    never produces a turn or a log row, and nothing reaches stderr.
+- **Peer range `^0.1.7-alpha.1 || ^0.2.0-rc.1`.** 0.1.7-alpha.1 is the
+  first dsh with every API above. The 0.2.0 line went in only after the
+  whole surface ran on a 0.2.0-rc.1 host. The range no longer claims
+  0.1.0–0.1.5, which this code cannot run on.
+- **`@deepseek-ai/schemastery` moved from `dependencies` to
+  `peerDependencies`.** As a dependency, `dsh plugin add` installed it,
+  with cosmokit, into the profile as a second copy that shadowed the
+  host's for every plugin there.
+- **Removed `backlogBytes` and `createBacklog`** (from
+  `@dshworks/dsh-watch/core`). The job registry's ring holds the output
+  and bounds it. A leftover `backlogBytes` in profile config is ignored.
+- **The release check now measures the real install path.**
+  `scripts/check-dsh-release.mjs` installs with `dsh plugin add` into a
+  scratch `DSH_HOME` beside dsh `latest` (and `next`, as an advisory). It
+  fails when dsh's compatibility gate refuses the plugin, or when the
+  profile ends up holding a package the host supplies. The old check
+  installed plugin and host into one npm tree, a path no user takes. The
+  harness splits it reported were measured in that tree, not in a dsh
+  profile. That includes the "15 harness packages" in the 0.2.2 entry
+  below and both reports in #8. It also never saw the one split the real
+  path has: schemastery in `dependencies`.
+- Tests: 91. The doubles now model dsh 0.1.7: the job registry, the shell
+  executor, `agent/created`, v4 source admission, and v4 log events. Each
+  fix above is mutation-checked: putting the 0.2.2 call back turns the
+  suite red. The doubles written for 0.1.5 had stayed green on 0.1.7
+  through all six breaks.
+
 ## 0.2.2 — 2026-09-17
 
 Installs beside dsh 0.1.5 again.
