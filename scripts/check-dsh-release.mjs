@@ -32,8 +32,14 @@
 //
 // Checked for this tree (`--tree-only`, what a PR would publish) and, by
 // default, for the PUBLISHED package too — a fix users cannot install is not a
-// fix. The host is dsh `latest` (or DSH_VERSION); `next`, when npm serves it
-// ahead of `latest`, is checked as an advisory and never fails the run.
+// fix. The published check pins the version package.json names, not `@latest`:
+// pnpm 11 holds back any version younger than 24 hours (its built-in
+// `minimumReleaseAge`), so for a day after every publish `@latest` still
+// installs the previous release, and a check that went red on that would be
+// red for a reason nobody can clear. A version on main that never reached npm
+// still fails, as it should. The host is dsh `latest` (or DSH_VERSION);
+// `next`, when npm serves it ahead of `latest`, is checked as an advisory and
+// never fails the run.
 //
 // Needs node, npm and pnpm (>= 10) on PATH; dsh itself calls pnpm.
 // Exit 0 clean, 1 drift, 2 could not check.
@@ -133,6 +139,10 @@ function check(spec, version, label, advisory = false) {
     return
   }
   const profileModules = join(home, 'profiles', 'web', 'node_modules')
+  // Name what was installed: a spec can resolve to something other than it says.
+  const installedManifest = join(profileModules, ...pkg.name.split('/'), 'package.json')
+  const installed = existsSync(installedManifest) ? JSON.parse(readFileSync(installedManifest, 'utf8')).version : 'nothing'
+  label = `${label} (installed ${installed})`
   const shadows = [...scopePackages(profileModules)]
     .filter(([name]) => hostInstall.supplies.has(name))
     .flatMap(([name, copies]) => copies.map(({ dir, version: v }) =>
@@ -177,10 +187,10 @@ try {
 check(tarball, latest, `this tree on dsh ${latest}`)
 // On a pull request only THIS TREE can be green: the published package is by
 // definition still the old one on the very PR that fixes it.
-if (!PR_ONLY) check(`${pkg.name}@latest`, latest, `published ${pkg.name} on dsh ${latest}`)
+if (!PR_ONLY) check(`${pkg.name}@${pkg.version}`, latest, `published ${pkg.name}@${pkg.version} on dsh ${latest}`)
 if (next) {
   check(tarball, next, `this tree on dsh ${next} (advisory)`, true)
-  if (!PR_ONLY) check(`${pkg.name}@latest`, next, `published ${pkg.name} on dsh ${next} (advisory)`, true)
+  if (!PR_ONLY) check(`${pkg.name}@${pkg.version}`, next, `published ${pkg.name}@${pkg.version} on dsh ${next} (advisory)`, true)
 }
 
 console.log(report.join('\n'))
