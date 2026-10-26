@@ -54,8 +54,16 @@ function assertV4Source(message) {
  * carrying the issued id and the output ring's `append`, and reads nothing
  * back from the hooks but `cancel` and `done`. `job_output` is a consuming
  * read of that ring, modeled by `read()`.
+ *
+ * `registry: 'batch'` swaps in the tool registry of deepseek-harness master
+ * after 0.2.1-rc.3, where `execute` delegates a raw model batch to the mounted
+ * executor (`ToolBatchInput` in packages/core/tools/src/executor.ts). It reads
+ * exactly what `executeToolBatch` reads (packages/core/tools/src/batch.ts):
+ * `calls.map` over `tool-call` blocks, `JSON.parse` of each block's string
+ * `arguments`, and `signal`/`agent` passed through. A single-call request has
+ * no `calls`, so it throws there, wrapped the way master wraps it.
  */
-function makeCtx({ shell, initiator, executeResult } = {}) {
+function makeCtx({ shell, initiator, executeResult, registry = 'single' } = {}) {
   const captured = {
     tools: new Map(),
     sections: [],
@@ -66,20 +74,39 @@ function makeCtx({ shell, initiator, executeResult } = {}) {
     executed: [],
   }
   let jobSeq = 0
+  const runOne = async (exec) => {
+    captured.executed.push(exec)
+    if (executeResult !== undefined) return executeResult
+    const tool = captured.tools.get(exec.name)
+    try {
+      const value = await tool.execute(exec.arguments, { agent: exec.agent, signal: exec.signal })
+      return { isError: false, value, content: [] }
+    } catch (error) {
+      return { isError: true, error: { code: 'TOOL_FAILED' }, content: [{ type: 'text', text: error.message }] }
+    }
+  }
+  const executeBatch = async (input) => {
+    try {
+      const { calls, signal, agent } = input
+      const planned = calls.map(block => ({
+        callId: block.id,
+        name: block.name,
+        arguments: block.arguments ? JSON.parse(block.arguments) : {},
+        ...agent === undefined ? {} : { agent },
+        signal,
+      }))
+      const results = []
+      for (const exec of planned) results.push({ callId: exec.callId, result: await runOne(exec) })
+      return { results, additionalContexts: [], concluded: false }
+    } catch (error) {
+      throw new Error('Tool batch execution failed', { cause: error })
+    }
+  }
   const ctx = {
     tools: {
       register: (tool) => void captured.tools.set(tool.name, tool),
-      execute: async (exec) => {
-        captured.executed.push(exec)
-        if (executeResult !== undefined) return executeResult
-        const tool = captured.tools.get(exec.name)
-        try {
-          const value = await tool.execute(exec.arguments, { agent: exec.agent, signal: exec.signal })
-          return { isError: false, value, content: [] }
-        } catch (error) {
-          return { isError: true, error: { code: 'TOOL_FAILED' }, content: [{ type: 'text', text: error.message }] }
-        }
-      },
+      execute: registry === 'batch' ? executeBatch : runOne,
+      ...registry === 'batch' ? { setExecutor: () => {} } : {},
     },
     systemPrompt: { section: (section) => void captured.sections.push(section) },
     jobs: {
@@ -579,6 +606,28 @@ describe('standing watches', () => {
     await start({ agent, source: 'startup' })
     await start({ agent, source: 'resume' })
     await vi.waitFor(() => expect(captured.executed.length).toBe(1))
+  })
+
+  it('arms through the batch registry deepseek-harness master ships after 0.2.1-rc.3', async () => {
+    const path = join(dir, 'batch.log')
+    writeFileSync(path, '')
+    const { ctx, captured } = makeCtx({ registry: 'batch' })
+    apply(ctx, standing([{ source: 'file', path, pattern: 'NEW', label: 'ecosystem' }]))
+    const agent = makeAgent('idle')
+    await captured.listeners.get('agent/created')({ agent, source: 'startup' })
+    await vi.waitFor(() => expect(captured.jobs.length).toBe(1))
+    expect(captured.warnings).toEqual([])
+    expect(captured.executed[0]).toMatchObject({ name: 'watch', arguments: { source: 'file', path, label: 'ecosystem' } })
+    expect(captured.executed[0].agent).toBe(agent)
+    expect(captured.jobs[0].spec.owner).toBe(agent.id)
+  })
+
+  it('reads a rejection off the batch result', async () => {
+    const { ctx, captured } = makeCtx({ registry: 'batch', executeResult: { isError: true, error: { code: 'DENIED' }, content: [{ type: 'text', text: 'guard said no' }] } })
+    apply(ctx, standing([{ source: 'command', command: 'tail -f /var/log/x', label: 'ecosystem' }]))
+    await captured.listeners.get('agent/created')({ agent: makeAgent('idle'), source: 'startup' })
+    await vi.waitFor(() => expect(captured.warnings.length).toBe(1))
+    expect(captured.warnings[0]).toContain('guard said no')
   })
 
   it('logs a rejected standing watch instead of failing the session', async () => {
