@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **Standing watches keep arming after dsh's tool-executor split.** On
+  deepseek-harness master after 0.2.1-rc.3, `ctx.tools.execute` takes a raw
+  model batch (`{ calls, signal, agent }`) and resolves
+  `{ results: [{ callId, result }] }`. Sent the old single-call shape it
+  throws on the missing `calls`, so every `autoArm` watch would fail with a
+  warning and nothing else. `autoArm` now sends the batch shape when the
+  registry has `setExecutor` (which arrived in the same change) and the
+  single call otherwise. Checked live on 0.2.1-rc.2 and rc.3 (a standing
+  watch armed and its lines arrived); the batch side is checked against a
+  test double that reads what master's `executeToolBatch` reads, because no
+  published dsh has it yet.
+
 ## 0.2.3 — 2026-09-29
 
 Runs on dsh 0.1.7 and 0.2.0. 0.2.2 installs on a 0.1.7 host without a
