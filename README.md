@@ -98,7 +98,10 @@ was empty earns a catch-up wake as soon as one comes back. Set
 
 **Something has to arm the watches, and something has to keep the process
 alive.** `dsh --profile headless` drives one task to quiescence and exits;
-`dsh --profile web` stays up but waits for a browser. So `autoArm` declares
+`dsh --profile web` stays up but creates no session until a browser opens
+one, unless a plugin creates its own (DeepSeek's
+[dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype)
+keeps a web profile under tmux and does exactly that). So `autoArm` declares
 watches in profile config — armed for the root session at
 `agent/created`, routed through the tool registry so they pass the
 same guards, approval policy, sandbox, and shell environment a model-issued
