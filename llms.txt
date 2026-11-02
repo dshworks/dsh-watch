@@ -49,8 +49,9 @@ it on an older host.
   `{ kind: 'plugin', plugin }` wrapper, and the failure is silent: no turn,
   no log row, nothing on stderr.
 - No stock dsh surface hosts a standing agent: `--profile headless` exits
-  at quiescence, `--profile web` waits for a browser. That gap is why the
-  daemon export exists.
+  at quiescence, `--profile web` creates no session until a browser opens
+  one. A plugin can create its own (deepseek-ai/dsh-superagent-prototype
+  does, under tmux); the daemon export is ours.
 - Watches do not survive a restart. A restarted daemon opens a fresh
   session and re-arms from `autoArm`.
 

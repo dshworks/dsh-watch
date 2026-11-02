@@ -89,7 +89,10 @@ watch(source: "file", path: "/var/log/app.log", pattern: "ERROR|FATAL")
 `dsh-tool-jobs` 语义，把 `wakeRefillMs` 设为 `0`。
 
 **得有人去布防，也得有人让进程活着。** `dsh --profile headless` 跑完一个任务到静默
-就退出；`dsh --profile web` 常驻，但要等浏览器里的人。于是 `autoArm` 把监听声明进
+就退出；`dsh --profile web` 常驻，但在浏览器打开之前不会自己建 session，除非有插件
+自己建（DeepSeek 的
+[dsh-superagent-prototype](https://github.com/deepseek-ai/dsh-superagent-prototype)
+就是用 tmux 挂着 web profile 这样做的）。于是 `autoArm` 把监听声明进
 profile 配置 —— 在 `agent/created` 时为根会话布防，并且走工具注册表，
 因此它要过的守卫、审批策略、沙箱和 shell 环境，跟模型自己发起的调用完全一致 ——
 而 `@dshworks/dsh-watch/daemon` 是一个约 90 行的宿主：创建一个 agent、注入一份常驻
