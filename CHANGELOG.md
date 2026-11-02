@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.4
 
 - **Standing watches keep arming after dsh's tool-executor split.** On
   deepseek-harness master after 0.2.1-rc.3, `ctx.tools.execute` takes a raw
